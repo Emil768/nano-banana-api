@@ -35,6 +35,7 @@ npm start
 - `SUPABASE_USERS_TABLE=users`
 - `SUPABASE_CHAT_ID_COLUMN=chat_id`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
+- `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
 
 ## 4) Что указывать в Telegram Widget
 
@@ -62,7 +63,7 @@ npm start
 - проверяет свежесть `auth_date`;
 - берет `id` как `chat_id`;
 - ищет пользователя в Supabase по `chat_id`;
-- при `AUTO_CREATE_USER=true` создаст запись, если ее нет;
+- при `AUTO_CREATE_USER=true` создаст запись, если ее нет (минимум только `chat_id`);
 - ставит cookie `chatid` и `tg_session`;
 - редиректит на `FRONTEND_SUCCESS_REDIRECT`.
 
