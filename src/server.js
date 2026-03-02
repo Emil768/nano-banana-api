@@ -19,7 +19,10 @@ const FRONTEND_ORIGIN = normalizeEnv(
   process.env.FRONTEND_ORIGIN,
   "https://nanobananaa.ru"
 );
-const ALLOWED_ORIGINS = normalizeEnv(process.env.ALLOWED_ORIGINS, FRONTEND_ORIGIN)
+const ALLOWED_ORIGINS = normalizeEnv(
+  process.env.ALLOWED_ORIGINS,
+  FRONTEND_ORIGIN
+)
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -69,12 +72,18 @@ const SUPABASE_TOTAL_SUM_COLUMN = normalizeEnv(
   process.env.SUPABASE_TOTAL_SUM_COLUMN,
   "total_sum"
 );
-const SUPABASE_PRICES_TABLE = normalizeEnv(process.env.SUPABASE_PRICES_TABLE, "user_price");
+const SUPABASE_PRICES_TABLE = normalizeEnv(
+  process.env.SUPABASE_PRICES_TABLE,
+  "user_price"
+);
 const SUPABASE_PRICES_FREE_TABLE = normalizeEnv(
   process.env.SUPABASE_PRICES_FREE_TABLE,
   "user_price_free"
 );
-const SUPABASE_PRICE_ID_COLUMN = normalizeEnv(process.env.SUPABASE_PRICE_ID_COLUMN, "id");
+const SUPABASE_PRICE_ID_COLUMN = normalizeEnv(
+  process.env.SUPABASE_PRICE_ID_COLUMN,
+  "id"
+);
 const SUPABASE_PRICE_NAME_COLUMN = normalizeEnv(
   process.env.SUPABASE_PRICE_NAME_COLUMN,
   "name"
@@ -87,7 +96,10 @@ const SUPABASE_PRICE_AMOUNT_COLUMN = normalizeEnv(
   process.env.SUPABASE_PRICE_AMOUNT_COLUMN,
   "price_rub"
 );
-const SUPABASE_VERSION_COLUMN = normalizeEnv(process.env.SUPABASE_VERSION_COLUMN, "version");
+const SUPABASE_VERSION_COLUMN = normalizeEnv(
+  process.env.SUPABASE_VERSION_COLUMN,
+  "version"
+);
 const AUTO_CREATE_USER =
   String(process.env.AUTO_CREATE_USER || "true") === "true";
 
@@ -98,15 +110,22 @@ const LAOZHANG_URL_FREE =
   normalizeEnv(process.env.LAOZHANG_URL_FREE) ||
   "https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent";
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
-const LAOZHANG_AUTH_MODE = (
-  normalizeEnv(process.env.LAOZHANG_AUTH_MODE, "bearer")
+const LAOZHANG_AUTH_MODE = normalizeEnv(
+  process.env.LAOZHANG_AUTH_MODE,
+  "bearer"
 ).toLowerCase();
 const PAYMENT_PROVIDER_URL =
   normalizeEnv(process.env.PAYMENT_PROVIDER_URL) ||
   "https://app.platega.io/transaction/process";
-const PAYMENT_PROVIDER_API_KEY = normalizeEnv(process.env.PAYMENT_PROVIDER_API_KEY);
-const PAYMENT_PROVIDER_MERCHANT_ID = normalizeEnv(process.env.PAYMENT_PROVIDER_MERCHANT_ID);
-const PAYMENT_PROVIDER_SECRET = normalizeEnv(process.env.PAYMENT_PROVIDER_SECRET);
+const PAYMENT_PROVIDER_API_KEY = normalizeEnv(
+  process.env.PAYMENT_PROVIDER_API_KEY
+);
+const PAYMENT_PROVIDER_MERCHANT_ID = normalizeEnv(
+  process.env.PAYMENT_PROVIDER_MERCHANT_ID
+);
+const PAYMENT_PROVIDER_SECRET = normalizeEnv(
+  process.env.PAYMENT_PROVIDER_SECRET
+);
 const PAYMENT_PROVIDER_MERCHANT_HEADER = normalizeEnv(
   process.env.PAYMENT_PROVIDER_MERCHANT_HEADER,
   "X-MerchantId"
@@ -124,7 +143,8 @@ const PAYMENT_PROVIDER_KEY_HEADER = normalizeEnv(
 );
 const PAYMENT_METHOD = Number(process.env.PAYMENT_METHOD || 2);
 const PAYMENT_RETURN_URL =
-  normalizeEnv(process.env.PAYMENT_RETURN_URL) || `${FRONTEND_ORIGIN}/generate.html`;
+  normalizeEnv(process.env.PAYMENT_RETURN_URL) ||
+  `${FRONTEND_ORIGIN}/generate.html`;
 const PAYMENT_CURRENCY = normalizeEnv(process.env.PAYMENT_CURRENCY, "RUB");
 const WEBHOOK_SECRET = normalizeEnv(process.env.PAYMENT_WEBHOOK_SECRET);
 const WEBHOOK_SECRET_HEADER = normalizeEnv(
@@ -198,7 +218,8 @@ function isTelegramAuthDataValid(query) {
 }
 
 function setChatCookies(req, res, chatId) {
-  const isLocalHost = req.hostname === "127.0.0.1" || req.hostname === "localhost";
+  const isLocalHost =
+    req.hostname === "127.0.0.1" || req.hostname === "localhost";
   const common = {
     secure: isLocalHost ? false : COOKIE_SECURE,
     // Chrome rejects SameSite=None cookies without Secure on local http.
@@ -216,7 +237,8 @@ function setChatCookies(req, res, chatId) {
 
 function createSessionToken(chatId) {
   if (!AUTH_SESSION_SECRET) return "";
-  const exp = Math.floor(Date.now() / 1000) + Math.max(COOKIE_MAX_AGE_SECONDS, 3600);
+  const exp =
+    Math.floor(Date.now() / 1000) + Math.max(COOKIE_MAX_AGE_SECONDS, 3600);
   const base = `${chatId}.${exp}`;
   const sig = crypto
     .createHmac("sha256", AUTH_SESSION_SECRET)
@@ -253,7 +275,9 @@ function buildSuccessRedirectUrl(chatId) {
     return target.toString();
   } catch {
     const glue = FRONTEND_SUCCESS_REDIRECT.includes("?") ? "&" : "?";
-    return `${FRONTEND_SUCCESS_REDIRECT}${glue}session=${encodeURIComponent(token)}`;
+    return `${FRONTEND_SUCCESS_REDIRECT}${glue}session=${encodeURIComponent(
+      token
+    )}`;
   }
 }
 
@@ -320,7 +344,9 @@ function mapPlanForFrontend(plan) {
 }
 
 function parseWebhookPayload(payloadValue) {
-  const [chatIdRaw, maybeVersionRaw, maybePaymentIdRaw] = String(payloadValue || "").split("-");
+  const [chatIdRaw, maybeVersionRaw, maybePaymentIdRaw] = String(
+    payloadValue || ""
+  ).split("-");
   const hasVersion =
     String(maybeVersionRaw || "").toLowerCase() === "free" ||
     String(maybeVersionRaw || "").toLowerCase() === "pro";
@@ -379,7 +405,8 @@ function resolvePaymentProviderHeaders() {
   };
 
   if (PAYMENT_PROVIDER_MERCHANT_ID) {
-    providerHeaders[PAYMENT_PROVIDER_MERCHANT_HEADER] = PAYMENT_PROVIDER_MERCHANT_ID;
+    providerHeaders[PAYMENT_PROVIDER_MERCHANT_HEADER] =
+      PAYMENT_PROVIDER_MERCHANT_ID;
   }
   if (PAYMENT_PROVIDER_SECRET) {
     providerHeaders[PAYMENT_PROVIDER_SECRET_HEADER] = PAYMENT_PROVIDER_SECRET;
@@ -419,7 +446,9 @@ function requireChatId(req, res, next) {
   }
 
   const authHeader = String(req.headers.authorization || "");
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
   const chatIdFromToken = verifySessionToken(token);
   const chatId = chatIdFromToken || "";
   if (!chatId) {
@@ -480,7 +509,9 @@ app.get("/auth/me", requireChatId, async (req, res) => {
       balance:
         SUPABASE_BALANCE_COLUMN in user ? user[SUPABASE_BALANCE_COLUMN] : null,
       balance_free:
-        SUPABASE_BALANCE_FREE_COLUMN in user ? user[SUPABASE_BALANCE_FREE_COLUMN] : null,
+        SUPABASE_BALANCE_FREE_COLUMN in user
+          ? user[SUPABASE_BALANCE_FREE_COLUMN]
+          : null,
       version: normalizeVersionRuntime(user?.[SUPABASE_VERSION_COLUMN]),
       user,
     });
@@ -566,7 +597,9 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
     const generations = Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0);
     const amount = Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0);
     if (!Number.isFinite(generations) || generations <= 0) {
-      return res.status(400).json({ error: "Некорректное количество генераций" });
+      return res
+        .status(400)
+        .json({ error: "Некорректное количество генераций" });
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: "Некорректная сумма тарифа" });
@@ -575,7 +608,9 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
     const payload = `${req.chatId}-${versionCfg.versionRuntime}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
     const providerRequestBody = {
       paymentMethod: PAYMENT_METHOD,
-      description: `Оплата ${generations} генераций (${versionCfg.versionRuntime.toUpperCase()}) для юзера ${req.chatId}`,
+      description: `Оплата ${generations} генераций (${versionCfg.versionRuntime.toUpperCase()}) для юзера ${
+        req.chatId
+      }`,
       paymentDetails: {
         amount,
         currency: PAYMENT_CURRENCY,
@@ -621,7 +656,12 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       });
     }
 
-    return res.json({ ok: true, paymentUrl, raw, version: versionCfg.versionRuntime });
+    return res.json({
+      ok: true,
+      paymentUrl,
+      raw,
+      version: versionCfg.versionRuntime,
+    });
   } catch (error) {
     console.error("payments/create error", error);
     return res.status(500).json({ error: "Не удалось создать платеж" });
@@ -759,10 +799,16 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         rawData?.candidates?.[0]?.content?.parts ||
         rawData?.data?.candidates?.[0]?.content?.parts ||
         [];
-      const imagePart = parts.find(
-        (part) => part?.inline_data?.data || part?.inlineData?.data
-      );
-      return imagePart?.inline_data?.data || imagePart?.inlineData?.data || null;
+      const imagePart = parts.find((part) => {
+        const inline = part?.inline_data || part?.inlineData;
+        return typeof inline?.data === "string";
+      });
+      if (!imagePart) return null;
+      const inline = imagePart?.inline_data || imagePart?.inlineData;
+      return {
+        imageData: inline?.data || null,
+        mimeType: inline?.mime_type || inline?.mimeType || "image/png",
+      };
     };
 
     const generatedImages = [];
@@ -787,16 +833,20 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         continue;
       }
 
-      const imageData = extractImageFromRaw(raw);
-      if (!imageData) {
+      const extracted = extractImageFromRaw(raw);
+      if (!extracted?.imageData) {
         generationErrors.push({
           index: i + 1,
           status: 502,
-          message: "Апстрим не вернул изображение",
+          message: "Ошибка сервиса",
         });
         continue;
       }
-      generatedImages.push({ imageData, raw });
+      generatedImages.push({
+        imageData: extracted.imageData,
+        mimeType: extracted.mimeType,
+        raw,
+      });
     }
 
     if (!generatedImages.length) {
@@ -826,7 +876,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     return res.json({
       imageData: generatedImages[0].imageData,
-      images: generatedImages.map((item) => item.imageData),
+      images: generatedImages.map((item) => ({
+        data: item.imageData,
+        mimeType: item.mimeType || "image/png",
+      })),
       raw: generatedImages[0].raw,
       balance: nextBalance,
       charged: generatedImages.length,
