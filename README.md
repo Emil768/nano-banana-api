@@ -4,6 +4,7 @@
 - входа через Telegram Widget (`/auth/telegram/callback`);
 - идентификации пользователя по `chat_id` в Supabase;
 - проксирования генерации (`/api/generate-image`) с скрытым API-ключом.
+- оплаты и пополнения генераций через webhook (`/api/webhooks/platega`).
 
 ## 1) Что нужно от тебя
 
@@ -34,8 +35,32 @@ npm start
 - `COOKIE_SECURE=true`
 - `SUPABASE_USERS_TABLE=users`
 - `SUPABASE_CHAT_ID_COLUMN=chat_id`
+- `SUPABASE_BALANCE_COLUMN=balance`
+- `SUPABASE_BALANCE_FREE_COLUMN=balance_free`
+- `SUPABASE_TOTAL_SUM_COLUMN=total_sum`
+- `SUPABASE_PRICES_TABLE=user_price`
+- `SUPABASE_PRICES_FREE_TABLE=user_price_free`
+- `SUPABASE_PRICE_ID_COLUMN=id`
+- `SUPABASE_PRICE_NAME_COLUMN=name`
+- `SUPABASE_PRICE_GENERATIONS_COLUMN=generations`
+- `SUPABASE_PRICE_AMOUNT_COLUMN=price_rub`
+- `SUPABASE_VERSION_COLUMN=version`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
+- `LAOZHANG_URL_FREE=https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent`
 - `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
+- `PAYMENT_PROVIDER_URL=https://app.platega.io/transaction/process`
+- `PAYMENT_PROVIDER_API_KEY=...`
+- `PAYMENT_PROVIDER_AUTH_MODE=none` (`none`/`bearer`/`header`)
+- `PAYMENT_PROVIDER_KEY_HEADER=x-api-key`
+- `PAYMENT_PROVIDER_MERCHANT_ID=...` (для Platega)
+- `PAYMENT_PROVIDER_SECRET=...` (для Platega)
+- `PAYMENT_PROVIDER_MERCHANT_HEADER=X-MerchantId`
+- `PAYMENT_PROVIDER_SECRET_HEADER=X-Secret`
+- `PAYMENT_METHOD=2`
+- `PAYMENT_RETURN_URL=https://nanobananaa.ru/generate.html`
+- `PAYMENT_CURRENCY=RUB`
+- `PAYMENT_WEBHOOK_SECRET=...` (рекомендуется)
+- `PAYMENT_WEBHOOK_SECRET_HEADER=x-webhook-secret`
 
 ## 4) Что указывать в Telegram Widget
 
@@ -72,6 +97,10 @@ npm start
 - `GET /health`
 - `GET /auth/me` (нужна cookie)
 - `POST /auth/logout`
+- `POST /api/version` (нужна cookie, body: `{ "version": "pro" | "free" }`)
+- `GET /api/pricing?version=pro|free` (нужна cookie)
+- `POST /api/payments/create` (нужна cookie, body: `{ "planId": 1, "version": "pro" | "free" }`)
+- `POST /api/webhooks/platega` (webhook от платежки)
 - `POST /api/generate-image` (нужна cookie)
 
 ## 7) Проверка после деплоя
@@ -82,7 +111,19 @@ npm start
 4. Проверить `GET https://api.nanobananaa.ru/auth/me` (должен вернуть `authenticated: true`)
 5. Запустить генерацию
 
-## 8) Важно по безопасности
+## 8) Миграция под переключатель версии
+
+Добавь колонки в `user_settings`:
+
+```sql
+alter table user_settings
+add column if not exists version text default 'pro';
+
+alter table user_settings
+add column if not exists balance_free integer default 0;
+```
+
+## 9) Важно по безопасности
 
 - Не хранить `SUPABASE_SERVICE_ROLE_KEY` и `LAOZHANG_API_KEY` во фронте.
 - Использовать только HTTPS.
