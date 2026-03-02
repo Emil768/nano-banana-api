@@ -294,9 +294,9 @@ async function getUserByChatId(chatId) {
   return data || null;
 }
 
-async function createUserIfMissing(chatId, source = "telegram_widget") {
+async function createUserIfMissing(chatId) {
   if (!supabase) return null;
-  const baseInsertPayload = {
+  const insertPayload = {
     [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
     [SUPABASE_BALANCE_COLUMN]: 0,
     [SUPABASE_BALANCE_FREE_COLUMN]: 0,
@@ -306,35 +306,13 @@ async function createUserIfMissing(chatId, source = "telegram_widget") {
     type_photo: "4K",
     select_type: "photo",
     status: "null",
-    style_photo: "empty",
+    style_photo: "",
   };
-  if (SUPABASE_SOURCE_COLUMN) {
-    baseInsertPayload[SUPABASE_SOURCE_COLUMN] = source;
-  }
-  let data = null;
-  let error = null;
-
-  ({ data, error } = await supabase
+  const { data, error } = await supabase
     .from(SUPABASE_USERS_TABLE)
-    .insert(baseInsertPayload)
+    .insert(insertPayload)
     .select("*")
-    .single());
-
-  if (error) {
-    const fallbackInsertPayload = {
-      [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
-      [SUPABASE_VERSION_COLUMN]: "PRO",
-    };
-    if (SUPABASE_SOURCE_COLUMN) {
-      fallbackInsertPayload[SUPABASE_SOURCE_COLUMN] = source;
-    }
-    ({ data, error } = await supabase
-      .from(SUPABASE_USERS_TABLE)
-      .insert(fallbackInsertPayload)
-      .select("*")
-      .single());
-  }
-
+    .single();
   if (error) throw error;
   return data;
 }
@@ -585,7 +563,7 @@ app.get("/auth/me", requireChatId, async (req, res) => {
   try {
     let user = await getUserByChatId(req.chatId);
     if (!user) {
-      user = await createUserIfMissing(req.chatId, "auth_me");
+      user = await createUserIfMissing(req.chatId);
       if (!user) {
         return res
           .status(401)
@@ -876,7 +854,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     let user = await getUserByChatId(req.chatId);
     if (!user) {
-      user = await createUserIfMissing(req.chatId, "generate_image");
+      user = await createUserIfMissing(req.chatId);
       if (!user) {
         return res
           .status(401)
