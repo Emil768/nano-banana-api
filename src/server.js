@@ -432,6 +432,19 @@ function resolvePaymentUrl(raw) {
   );
 }
 
+function emitSseEvent(chatId, eventName, payload = {}) {
+  const subscribers = sseClientsByChatId.get(String(chatId));
+  if (!subscribers?.size) return;
+  const eventPayload = JSON.stringify({
+    chat_id: String(chatId),
+    ts: Date.now(),
+    ...payload,
+  });
+  subscribers.forEach((client) => {
+    client.write(`event: ${eventName}\ndata: ${eventPayload}\n\n`);
+  });
+}
+
 function resolveChatIdFromRequest(req, options = {}) {
   const { allowQuerySession = false } = options;
   const chatIdFromCookie = req.cookies?.chatid;
@@ -732,13 +745,6 @@ app.post("/api/webhooks/platega", async (req, res) => {
     const statusRaw =
       body?.status || body?.payment_status || body?.state || body?.event || "";
     const status = String(statusRaw).toLowerCase();
-    const isSuccess =
-      !status ||
-      ["success", "succeeded", "paid", "completed", "ok"].includes(status);
-    if (!isSuccess) {
-      return res.json({ ok: true, ignored: true, status });
-    }
-
     const payloadValue =
       body?.payload ||
       body?.data?.payload ||
@@ -748,8 +754,37 @@ app.post("/api/webhooks/platega", async (req, res) => {
     if (!parsed) {
       return res.status(400).json({ error: "invalid payload format" });
     }
-
     const { chatId, paymentId } = parsed;
+
+    const isPending = status === "pending";
+    if (isPending) {
+      emitSseEvent(chatId, "payment_pending", {
+        type: "payment_pending",
+        status,
+        payment_id: paymentId,
+      });
+      return res.json({ ok: true, pending: true, status });
+    }
+
+    const isFailure = ["canceled", "chargebacked"].includes(status);
+    if (isFailure) {
+      emitSseEvent(chatId, "payment_failed", {
+        type: "payment_failed",
+        status,
+        payment_id: paymentId,
+      });
+      return res.json({ ok: true, ignored: true, status });
+    }
+
+    const isSuccess = status === "confirmed";
+    if (!isSuccess) {
+      emitSseEvent(chatId, "payment_failed", {
+        type: "payment_failed",
+        status: status || "unknown",
+        payment_id: paymentId,
+      });
+      return res.json({ ok: true, ignored: true, status });
+    }
     const user = await getUserByChatId(chatId);
     if (!user) {
       return res.status(404).json({ error: "user not found" });
@@ -785,20 +820,12 @@ app.post("/api/webhooks/platega", async (req, res) => {
       throw updateError;
     }
 
-    const subscribers = sseClientsByChatId.get(String(chatId));
-    if (subscribers?.size) {
-      const eventPayload = JSON.stringify({
+    emitSseEvent(chatId, "balance_update", {
         type: "balance_update",
-        chat_id: chatId,
         version: versionCfg.versionRuntime,
         balance: nextBalance,
         total_sum: nextTotalSum,
-        ts: Date.now(),
       });
-      subscribers.forEach((client) => {
-        client.write(`event: balance_update\ndata: ${eventPayload}\n\n`);
-      });
-    }
 
     return res.json({
       ok: true,
