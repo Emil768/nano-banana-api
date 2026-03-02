@@ -103,11 +103,22 @@ const SUPABASE_VERSION_COLUMN = normalizeEnv(
 const AUTO_CREATE_USER =
   String(process.env.AUTO_CREATE_USER || "true") === "true";
 
+const normalizeLaozhangEndpoint = (value, fallback) => {
+  const raw = normalizeEnv(value, fallback);
+  return raw.replace("/v1/beta/", "/v1beta/");
+};
+
 const LAOZHANG_URL =
-  normalizeEnv(process.env.LAOZHANG_URL) ||
+  normalizeLaozhangEndpoint(
+    process.env.LAOZHANG_URL,
+    "https://api.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent"
+  ) ||
   "https://api.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent";
 const LAOZHANG_URL_FREE =
-  normalizeEnv(process.env.LAOZHANG_URL_FREE) ||
+  normalizeLaozhangEndpoint(
+    process.env.LAOZHANG_URL_FREE,
+    "https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent"
+  ) ||
   "https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent";
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
 const LAOZHANG_AUTH_MODE = normalizeEnv(
