@@ -925,45 +925,92 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     const generatedImages = [];
     const generationErrors = [];
+    const MAX_UPSTREAM_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 1200;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const normalizeUpstreamErrorMessage = (rawError) => {
+      if (typeof rawError === "string" && rawError.trim()) return rawError;
+      if (rawError?.message) return String(rawError.message);
+      if (rawError?.localized_message) return String(rawError.localized_message);
+      if (rawError?.type) return String(rawError.type);
+      return "Ошибка сервиса";
+    };
+
     for (let i = 0; i < requestedCount; i += 1) {
       const upstreamPayload = {
         ...upstreamPayloadBase,
         numberOfImages: 1,
       };
-      const upstreamResponse = await fetch(upstreamUrl, {
-        method: "POST",
-        headers: reqHeaders,
-        body: JSON.stringify(upstreamPayload),
-      });
-      const raw = await upstreamResponse.json().catch(() => ({}));
-      if (!upstreamResponse.ok) {
-        generationErrors.push({
-          index: i + 1,
-          status: upstreamResponse.status,
-          message: raw?.error?.message || raw?.error || "Ошибка апстрима",
-        });
-        continue;
+      let generatedItem = null;
+      let lastError = {
+        index: i + 1,
+        status: 502,
+        message: "Ошибка сервиса",
+      };
+
+      for (let attempt = 1; attempt <= MAX_UPSTREAM_ATTEMPTS; attempt += 1) {
+        try {
+          const upstreamResponse = await fetch(upstreamUrl, {
+            method: "POST",
+            headers: reqHeaders,
+            body: JSON.stringify(upstreamPayload),
+          });
+          const raw = await upstreamResponse.json().catch(() => ({}));
+          if (!upstreamResponse.ok) {
+            lastError = {
+              index: i + 1,
+              status: upstreamResponse.status,
+              message: normalizeUpstreamErrorMessage(raw?.error || raw),
+            };
+            if (attempt < MAX_UPSTREAM_ATTEMPTS) {
+              await sleep(RETRY_DELAY_MS);
+              continue;
+            }
+            break;
+          }
+
+          const extracted = extractImageFromRaw(raw);
+          if (!extracted?.imageData) {
+            lastError = {
+              index: i + 1,
+              status: 502,
+              message: "Ошибка сервиса",
+            };
+            if (attempt < MAX_UPSTREAM_ATTEMPTS) {
+              await sleep(RETRY_DELAY_MS);
+              continue;
+            }
+            break;
+          }
+
+          generatedItem = {
+            imageData: extracted.imageData,
+            mimeType: extracted.mimeType,
+            raw,
+          };
+          break;
+        } catch (error) {
+          lastError = {
+            index: i + 1,
+            status: 503,
+            message: error?.message || "Ошибка сервиса",
+          };
+          if (attempt < MAX_UPSTREAM_ATTEMPTS) {
+            await sleep(RETRY_DELAY_MS);
+          }
+        }
       }
 
-      const extracted = extractImageFromRaw(raw);
-      if (!extracted?.imageData) {
-        generationErrors.push({
-          index: i + 1,
-          status: 502,
-          message: "Ошибка сервиса",
-        });
-        continue;
+      if (generatedItem) {
+        generatedImages.push(generatedItem);
+      } else {
+        generationErrors.push(lastError);
       }
-      generatedImages.push({
-        imageData: extracted.imageData,
-        mimeType: extracted.mimeType,
-        raw,
-      });
     }
 
     if (!generatedImages.length) {
       return res.status(502).json({
-        error: "Не удалось сгенерировать изображения",
+        error: "Ошибка генерации, попробуйте еще раз через 10 секунд",
         code: "GENERATION_FAILED_ALL",
         details: generationErrors,
       });
