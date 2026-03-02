@@ -298,7 +298,7 @@ async function createUserIfMissing(chatId) {
   if (!supabase) return null;
   const insertPayload = {
     [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
-    [SUPABASE_BALANCE_COLUMN]: 0,
+    [SUPABASE_BALANCE_COLUMN]: 1,
     [SUPABASE_BALANCE_FREE_COLUMN]: 0,
     [SUPABASE_TOTAL_SUM_COLUMN]: 0,
     [SUPABASE_VERSION_COLUMN]: "PRO",
@@ -306,7 +306,7 @@ async function createUserIfMissing(chatId) {
     type_photo: "4K",
     select_type: "photo",
     status: "null",
-    style_photo: "",
+    style_photo: "empty",
   };
   const { data, error } = await supabase
     .from(SUPABASE_USERS_TABLE)
