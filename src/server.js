@@ -164,6 +164,7 @@ const supabase =
         auth: { persistSession: false },
       })
     : null;
+const sseClientsByChatId = new Map();
 
 app.set("trust proxy", 1);
 app.use(cookieParser());
@@ -344,14 +345,9 @@ function mapPlanForFrontend(plan) {
 }
 
 function parseWebhookPayload(payloadValue) {
-  const [chatIdRaw, maybeVersionRaw, maybePaymentIdRaw] = String(
-    payloadValue || ""
-  ).split("-");
-  const hasVersion =
-    String(maybeVersionRaw || "").toLowerCase() === "free" ||
-    String(maybeVersionRaw || "").toLowerCase() === "pro";
-  const version = hasVersion ? normalizeVersionRuntime(maybeVersionRaw) : "pro";
-  const paymentIdRaw = hasVersion ? maybePaymentIdRaw : maybeVersionRaw;
+  const parts = String(payloadValue || "").split("-");
+  const chatIdRaw = parts[0];
+  const paymentIdRaw = parts[parts.length - 1];
   const chatId = Number(chatIdRaw);
   const paymentId = Number(paymentIdRaw);
   if (!Number.isFinite(chatId) || !Number.isFinite(paymentId)) {
@@ -359,7 +355,6 @@ function parseWebhookPayload(payloadValue) {
   }
   return {
     chatId: String(chatId),
-    version,
     paymentId,
   };
 }
@@ -437,12 +432,11 @@ function resolvePaymentUrl(raw) {
   );
 }
 
-function requireChatId(req, res, next) {
+function resolveChatIdFromRequest(req, options = {}) {
+  const { allowQuerySession = false } = options;
   const chatIdFromCookie = req.cookies?.chatid;
   if (chatIdFromCookie) {
-    req.chatId = String(chatIdFromCookie);
-    next();
-    return;
+    return String(chatIdFromCookie);
   }
 
   const authHeader = String(req.headers.authorization || "");
@@ -450,7 +444,23 @@ function requireChatId(req, res, next) {
     ? authHeader.slice(7).trim()
     : "";
   const chatIdFromToken = verifySessionToken(token);
-  const chatId = chatIdFromToken || "";
+  if (chatIdFromToken) {
+    return String(chatIdFromToken);
+  }
+
+  if (allowQuerySession) {
+    const queryToken = String(req.query?.session || "").trim();
+    const chatIdFromQueryToken = verifySessionToken(queryToken);
+    if (chatIdFromQueryToken) {
+      return String(chatIdFromQueryToken);
+    }
+  }
+
+  return "";
+}
+
+function requireChatId(req, res, next) {
+  const chatId = resolveChatIdFromRequest(req);
   if (!chatId) {
     return res
       .status(401)
@@ -462,6 +472,47 @@ function requireChatId(req, res, next) {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/events", (req, res) => {
+  const chatId = resolveChatIdFromRequest(req, { allowQuerySession: true });
+  if (!chatId) {
+    return res
+      .status(401)
+      .json({ error: "Не авторизован. Войди через Telegram." });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const clients = sseClientsByChatId.get(chatId) || new Set();
+  clients.add(res);
+  sseClientsByChatId.set(chatId, clients);
+
+  res.write(
+    `event: connected\ndata: ${JSON.stringify({
+      ok: true,
+      chat_id: chatId,
+      ts: Date.now(),
+    })}\n\n`
+  );
+
+  const heartbeat = setInterval(() => {
+    res.write(`: ping ${Date.now()}\n\n`);
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    const active = sseClientsByChatId.get(chatId);
+    if (!active) return;
+    active.delete(res);
+    if (!active.size) {
+      sseClientsByChatId.delete(chatId);
+    }
+  });
 });
 
 app.get("/auth/telegram/callback", async (req, res) => {
@@ -605,7 +656,7 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       return res.status(400).json({ error: "Некорректная сумма тарифа" });
     }
 
-    const payload = `${req.chatId}-${versionCfg.versionRuntime}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
+    const payload = `${req.chatId}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
     const providerRequestBody = {
       paymentMethod: PAYMENT_METHOD,
       description: `Оплата ${generations} генераций (${versionCfg.versionRuntime.toUpperCase()}) для юзера ${
@@ -698,16 +749,16 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.status(400).json({ error: "invalid payload format" });
     }
 
-    const { chatId, version, paymentId } = parsed;
-    const versionCfg = resolveVersionConfig(version);
-    const plan = await getPricingPlanById(paymentId, versionCfg.pricesTable);
-    if (!plan) {
-      return res.status(404).json({ error: "pricing plan not found" });
-    }
-
+    const { chatId, paymentId } = parsed;
     const user = await getUserByChatId(chatId);
     if (!user) {
       return res.status(404).json({ error: "user not found" });
+    }
+    const selectedVersion = normalizeVersionRuntime(user?.[SUPABASE_VERSION_COLUMN]);
+    const versionCfg = resolveVersionConfig(selectedVersion);
+    const plan = await getPricingPlanById(paymentId, versionCfg.pricesTable);
+    if (!plan) {
+      return res.status(404).json({ error: "pricing plan not found" });
     }
 
     const generations = Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0);
@@ -732,6 +783,21 @@ app.post("/api/webhooks/platega", async (req, res) => {
 
     if (updateError) {
       throw updateError;
+    }
+
+    const subscribers = sseClientsByChatId.get(String(chatId));
+    if (subscribers?.size) {
+      const eventPayload = JSON.stringify({
+        type: "balance_update",
+        chat_id: chatId,
+        version: versionCfg.versionRuntime,
+        balance: nextBalance,
+        total_sum: nextTotalSum,
+        ts: Date.now(),
+      });
+      subscribers.forEach((client) => {
+        client.write(`event: balance_update\ndata: ${eventPayload}\n\n`);
+      });
     }
 
     return res.json({
