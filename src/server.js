@@ -34,6 +34,8 @@ const TELEGRAM_BOT_TOKEN = normalizeEnv(process.env.TELEGRAM_BOT_TOKEN);
 const TELEGRAM_WIDGET_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_WIDGET_MAX_AGE_SECONDS || 300
 );
+const AUTH_SESSION_SECRET =
+  normalizeEnv(process.env.AUTH_SESSION_SECRET) || TELEGRAM_BOT_TOKEN;
 
 const COOKIE_DOMAIN = normalizeEnv(process.env.COOKIE_DOMAIN) || undefined;
 const COOKIE_SECURE = String(process.env.COOKIE_SECURE || "true") === "true";
@@ -212,6 +214,49 @@ function setChatCookies(req, res, chatId) {
   res.cookie("tg_session", "1", { ...common, httpOnly: true });
 }
 
+function createSessionToken(chatId) {
+  if (!AUTH_SESSION_SECRET) return "";
+  const exp = Math.floor(Date.now() / 1000) + Math.max(COOKIE_MAX_AGE_SECONDS, 3600);
+  const base = `${chatId}.${exp}`;
+  const sig = crypto
+    .createHmac("sha256", AUTH_SESSION_SECRET)
+    .update(base)
+    .digest("hex");
+  return `${base}.${sig}`;
+}
+
+function verifySessionToken(tokenValue) {
+  if (!AUTH_SESSION_SECRET || !tokenValue) return null;
+  const token = String(tokenValue || "").trim();
+  const [chatIdRaw, expRaw, sigRaw] = token.split(".");
+  if (!chatIdRaw || !expRaw || !sigRaw) return null;
+  const exp = Number(expRaw);
+  if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) return null;
+  const base = `${chatIdRaw}.${expRaw}`;
+  const expectedSig = crypto
+    .createHmac("sha256", AUTH_SESSION_SECRET)
+    .update(base)
+    .digest("hex");
+  const expectedBuf = Buffer.from(expectedSig, "hex");
+  const sigBuf = Buffer.from(String(sigRaw), "hex");
+  if (expectedBuf.length !== sigBuf.length) return null;
+  if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
+  return String(chatIdRaw);
+}
+
+function buildSuccessRedirectUrl(chatId) {
+  const token = createSessionToken(chatId);
+  if (!token) return FRONTEND_SUCCESS_REDIRECT;
+  try {
+    const target = new URL(FRONTEND_SUCCESS_REDIRECT);
+    target.searchParams.set("session", token);
+    return target.toString();
+  } catch {
+    const glue = FRONTEND_SUCCESS_REDIRECT.includes("?") ? "&" : "?";
+    return `${FRONTEND_SUCCESS_REDIRECT}${glue}session=${encodeURIComponent(token)}`;
+  }
+}
+
 async function getUserByChatId(chatId) {
   if (!supabase) return null;
   const { data, error } = await supabase
@@ -366,7 +411,17 @@ function resolvePaymentUrl(raw) {
 }
 
 function requireChatId(req, res, next) {
-  const chatId = req.cookies?.chatid;
+  const chatIdFromCookie = req.cookies?.chatid;
+  if (chatIdFromCookie) {
+    req.chatId = String(chatIdFromCookie);
+    next();
+    return;
+  }
+
+  const authHeader = String(req.headers.authorization || "");
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const chatIdFromToken = verifySessionToken(token);
+  const chatId = chatIdFromToken || "";
   if (!chatId) {
     return res
       .status(401)
@@ -404,7 +459,7 @@ app.get("/auth/telegram/callback", async (req, res) => {
     }
 
     setChatCookies(req, res, chatId);
-    return res.redirect(FRONTEND_SUCCESS_REDIRECT);
+    return res.redirect(buildSuccessRedirectUrl(chatId));
   } catch (error) {
     console.error("telegram callback error", error);
     return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=server_error`);
