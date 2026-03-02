@@ -296,18 +296,44 @@ async function getUserByChatId(chatId) {
 
 async function createUserIfMissing(chatId, source = "telegram_widget") {
   if (!supabase) return null;
-  const insertPayload = {
+  const baseInsertPayload = {
     [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
+    [SUPABASE_BALANCE_COLUMN]: 0,
+    [SUPABASE_BALANCE_FREE_COLUMN]: 0,
+    [SUPABASE_TOTAL_SUM_COLUMN]: 0,
     [SUPABASE_VERSION_COLUMN]: "PRO",
+    format_photo: "auto",
+    type_photo: "4K",
+    select_type: "photo",
+    status: "null",
+    style_photo: "empty",
   };
   if (SUPABASE_SOURCE_COLUMN) {
-    insertPayload[SUPABASE_SOURCE_COLUMN] = source;
+    baseInsertPayload[SUPABASE_SOURCE_COLUMN] = source;
   }
-  const { data, error } = await supabase
+  let data = null;
+  let error = null;
+
+  ({ data, error } = await supabase
     .from(SUPABASE_USERS_TABLE)
-    .insert(insertPayload)
+    .insert(baseInsertPayload)
     .select("*")
-    .single();
+    .single());
+
+  if (error) {
+    const fallbackInsertPayload = {
+      [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
+      [SUPABASE_VERSION_COLUMN]: "PRO",
+    };
+    if (SUPABASE_SOURCE_COLUMN) {
+      fallbackInsertPayload[SUPABASE_SOURCE_COLUMN] = source;
+    }
+    ({ data, error } = await supabase
+      .from(SUPABASE_USERS_TABLE)
+      .insert(fallbackInsertPayload)
+      .select("*")
+      .single());
+  }
 
   if (error) throw error;
   return data;
@@ -543,12 +569,8 @@ app.get("/auth/telegram/callback", async (req, res) => {
     }
 
     let user = await getUserByChatId(chatId);
-    if (!user && AUTO_CREATE_USER) {
+    if (!user) {
       user = await createUserIfMissing(chatId);
-    }
-
-    if (!user && !AUTO_CREATE_USER) {
-      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=user_not_found`);
     }
 
     setChatCookies(req, res, chatId);
@@ -561,11 +583,14 @@ app.get("/auth/telegram/callback", async (req, res) => {
 
 app.get("/auth/me", requireChatId, async (req, res) => {
   try {
-    const user = await getUserByChatId(req.chatId);
+    let user = await getUserByChatId(req.chatId);
     if (!user) {
-      return res
-        .status(401)
-        .json({ authenticated: false, error: "Пользователь не найден" });
+      user = await createUserIfMissing(req.chatId, "auth_me");
+      if (!user) {
+        return res
+          .status(401)
+          .json({ authenticated: false, error: "Пользователь не найден" });
+      }
     }
     return res.json({
       authenticated: true,
@@ -789,7 +814,9 @@ app.post("/api/webhooks/platega", async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "user not found" });
     }
-    const selectedVersion = normalizeVersionRuntime(user?.[SUPABASE_VERSION_COLUMN]);
+    const selectedVersion = normalizeVersionRuntime(
+      user?.[SUPABASE_VERSION_COLUMN]
+    );
     const versionCfg = resolveVersionConfig(selectedVersion);
     const plan = await getPricingPlanById(paymentId, versionCfg.pricesTable);
     if (!plan) {
@@ -821,11 +848,11 @@ app.post("/api/webhooks/platega", async (req, res) => {
     }
 
     emitSseEvent(chatId, "balance_update", {
-        type: "balance_update",
-        version: versionCfg.versionRuntime,
-        balance: nextBalance,
-        total_sum: nextTotalSum,
-      });
+      type: "balance_update",
+      version: versionCfg.versionRuntime,
+      balance: nextBalance,
+      total_sum: nextTotalSum,
+    });
 
     return res.json({
       ok: true,
@@ -847,11 +874,14 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return res.status(500).json({ error: "LAOZHANG_API_KEY не настроен" });
     }
 
-    const user = await getUserByChatId(req.chatId);
+    let user = await getUserByChatId(req.chatId);
     if (!user) {
-      return res
-        .status(401)
-        .json({ error: "Пользователь не найден в Supabase" });
+      user = await createUserIfMissing(req.chatId, "generate_image");
+      if (!user) {
+        return res
+          .status(401)
+          .json({ error: "Пользователь не найден в Supabase" });
+      }
     }
 
     const requestedVersion = normalizeVersionRuntime(
