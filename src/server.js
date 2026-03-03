@@ -103,28 +103,31 @@ const SUPABASE_VERSION_COLUMN = normalizeEnv(
 const AUTO_CREATE_USER =
   String(process.env.AUTO_CREATE_USER || "true") === "true";
 
-const normalizeLaozhangEndpoint = (value, fallback) => {
-  const raw = normalizeEnv(value, fallback);
-  return raw.replace("/v1/beta/", "/v1beta/");
+const normalizeLaozhangPath = (value) => {
+  const raw = normalizeEnv(value);
+  if (!raw) return "";
+  const fromUrl = raw.match(/^https?:\/\/[^/]+(\/.*)$/i)?.[1] || raw;
+  const withLeadingSlash = fromUrl.startsWith("/") ? fromUrl : `/${fromUrl}`;
+  return withLeadingSlash.replace("/v1/beta/", "/v1beta/");
 };
 
-const LAOZHANG_URL =
-  normalizeLaozhangEndpoint(
-    process.env.LAOZHANG_URL,
-    "https://api-vip.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent"
-  ) ||
-  "https://api-vip.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent";
-const LAOZHANG_URL_FREE =
-  normalizeLaozhangEndpoint(
-    process.env.LAOZHANG_URL_FREE,
-    "https://api-vip.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent"
-  ) ||
-  "https://api-vip.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent";
+const normalizeLaozhangHost = (value) =>
+  normalizeEnv(value)
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+
+const LAOZHANG_URL = normalizeLaozhangPath(process.env.LAOZHANG_URL);
+const LAOZHANG_URL_FREE = normalizeLaozhangPath(process.env.LAOZHANG_URL_FREE);
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
 const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
   "bearer"
 ).toLowerCase();
+const LAOZHANG_HOSTS = [
+  normalizeLaozhangHost(process.env.LAOZHANG_URL_1),
+  normalizeLaozhangHost(process.env.LAOZHANG_URL_2),
+  normalizeLaozhangHost(process.env.LAOZHANG_URL_3),
+].filter(Boolean);
 const PAYMENT_PROVIDER_URL =
   normalizeEnv(process.env.PAYMENT_PROVIDER_URL) ||
   "https://app.platega.io/transaction/process";
@@ -389,7 +392,7 @@ function resolveVersionConfig(versionRuntime) {
       versionStorage: "FREE",
       balanceColumn: SUPABASE_BALANCE_FREE_COLUMN,
       pricesTable: SUPABASE_PRICES_FREE_TABLE,
-      upstreamUrl: LAOZHANG_URL_FREE,
+      upstreamPath: LAOZHANG_URL_FREE,
     };
   }
   return {
@@ -397,8 +400,34 @@ function resolveVersionConfig(versionRuntime) {
     versionStorage: "PRO",
     balanceColumn: SUPABASE_BALANCE_COLUMN,
     pricesTable: SUPABASE_PRICES_TABLE,
-    upstreamUrl: LAOZHANG_URL,
+    upstreamPath: LAOZHANG_URL,
   };
+}
+
+function buildLaozhangUpstreamCandidates(upstreamPath) {
+  if (!upstreamPath) return [];
+  if (!LAOZHANG_HOSTS.length) return [];
+
+  const out = [];
+  for (const host of LAOZHANG_HOSTS) {
+    if (!host) continue;
+    out.push(`https://${host}${upstreamPath}`);
+  }
+  return [...new Set(out)];
+}
+
+function buildLaozhangRequest(url) {
+  const headers = { "Content-Type": "application/json" };
+  let requestUrl = url;
+
+  if (LAOZHANG_AUTH_MODE === "query") {
+    const glue = requestUrl.includes("?") ? "&" : "?";
+    requestUrl = `${requestUrl}${glue}key=${encodeURIComponent(LAOZHANG_API_KEY)}`;
+  } else {
+    headers.Authorization = `Bearer ${LAOZHANG_API_KEY}`;
+  }
+
+  return { requestUrl, headers };
 }
 
 function parseJsonOrRaw(rawText) {
@@ -892,15 +921,22 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    const reqHeaders = { "Content-Type": "application/json" };
-    let upstreamUrl = versionCfg.upstreamUrl;
-    if (LAOZHANG_AUTH_MODE === "query") {
-      const glue = upstreamUrl.includes("?") ? "&" : "?";
-      upstreamUrl = `${upstreamUrl}${glue}key=${encodeURIComponent(
-        LAOZHANG_API_KEY
-      )}`;
-    } else {
-      reqHeaders.Authorization = `Bearer ${LAOZHANG_API_KEY}`;
+    const upstreamCandidates = buildLaozhangUpstreamCandidates(
+      versionCfg.upstreamPath
+    );
+    if (!versionCfg.upstreamPath) {
+      return res.status(500).json({
+        error:
+          requestedVersion === "free"
+            ? "LAOZHANG_URL_FREE не настроен"
+            : "LAOZHANG_URL не настроен",
+      });
+    }
+    if (!upstreamCandidates.length) {
+      return res.status(500).json({
+        error:
+          "Не настроены хосты LAOZHANG_URL_1/LAOZHANG_URL_2/LAOZHANG_URL_3",
+      });
     }
 
     const upstreamPayloadBase = { ...req.body };
@@ -913,6 +949,22 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       }
     }
     const extractImageFromRaw = (rawData) => {
+      const normalizeImageString = (value, fallbackMime = "image/png") => {
+        if (typeof value !== "string" || !value.trim()) return null;
+        const trimmed = value.trim();
+        const dataUrlMatch = trimmed.match(/^data:(.+?);base64,(.+)$/i);
+        if (dataUrlMatch) {
+          return {
+            imageData: dataUrlMatch[2],
+            mimeType: dataUrlMatch[1] || fallbackMime,
+          };
+        }
+        return {
+          imageData: trimmed,
+          mimeType: fallbackMime,
+        };
+      };
+
       const parts =
         rawData?.candidates?.[0]?.content?.parts ||
         rawData?.data?.candidates?.[0]?.content?.parts ||
@@ -921,19 +973,29 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         const inline = part?.inline_data || part?.inlineData;
         return typeof inline?.data === "string";
       });
-      if (!imagePart) return null;
-      const inline = imagePart?.inline_data || imagePart?.inlineData;
-      return {
-        imageData: inline?.data || null,
-        mimeType: inline?.mime_type || inline?.mimeType || "image/png",
-      };
+      if (imagePart) {
+        const inline = imagePart?.inline_data || imagePart?.inlineData;
+        const fromInline = {
+          imageData: inline?.data || null,
+          mimeType: inline?.mime_type || inline?.mimeType || "image/png",
+        };
+        if (fromInline.imageData) return fromInline;
+      }
+
+      const simpleCandidates = [
+        normalizeImageString(rawData?.imageData, "image/png"),
+        normalizeImageString(rawData?.image, "image/png"),
+        normalizeImageString(rawData?.data?.[0]?.b64_json, "image/png"),
+        normalizeImageString(rawData?.output?.[0]?.b64_json, "image/png"),
+        normalizeImageString(rawData?.predictions?.[0]?.bytesBase64Encoded, "image/png"),
+      ].filter(Boolean);
+      if (simpleCandidates.length) return simpleCandidates[0];
+
+      return null;
     };
 
     const generatedImages = [];
     const generationErrors = [];
-    const MAX_UPSTREAM_ATTEMPTS = 3;
-    const RETRY_DELAY_MS = 1200;
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const normalizeUpstreamErrorMessage = (rawError) => {
       if (typeof rawError === "string" && rawError.trim()) return rawError;
       if (rawError?.message) return String(rawError.message);
@@ -953,11 +1015,12 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         message: "Ошибка сервиса",
       };
 
-      for (let attempt = 1; attempt <= MAX_UPSTREAM_ATTEMPTS; attempt += 1) {
+      for (const candidateUrl of upstreamCandidates) {
         try {
-          const upstreamResponse = await fetch(upstreamUrl, {
+          const { requestUrl, headers } = buildLaozhangRequest(candidateUrl);
+          const upstreamResponse = await fetch(requestUrl, {
             method: "POST",
-            headers: reqHeaders,
+            headers,
             body: JSON.stringify(upstreamPayload),
           });
           const raw = await upstreamResponse.json().catch(() => ({}));
@@ -967,11 +1030,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
               status: upstreamResponse.status,
               message: normalizeUpstreamErrorMessage(raw?.error || raw),
             };
-            if (attempt < MAX_UPSTREAM_ATTEMPTS) {
-              await sleep(RETRY_DELAY_MS);
-              continue;
-            }
-            break;
+            continue;
           }
 
           const extracted = extractImageFromRaw(raw);
@@ -979,13 +1038,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
             lastError = {
               index: i + 1,
               status: 502,
-              message: "Ошибка сервиса",
+              message: "Сервис вернул ответ без изображения",
             };
-            if (attempt < MAX_UPSTREAM_ATTEMPTS) {
-              await sleep(RETRY_DELAY_MS);
-              continue;
-            }
-            break;
+            continue;
           }
 
           generatedItem = {
@@ -1000,9 +1055,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
             status: 503,
             message: error?.message || "Ошибка сервиса",
           };
-          if (attempt < MAX_UPSTREAM_ATTEMPTS) {
-            await sleep(RETRY_DELAY_MS);
-          }
         }
       }
 
