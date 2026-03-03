@@ -123,6 +123,7 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
   "bearer"
 ).toLowerCase();
+const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
 const LAOZHANG_HOSTS = [
   normalizeLaozhangHost(process.env.LAOZHANG_URL_1),
   normalizeLaozhangHost(process.env.LAOZHANG_URL_2),
@@ -406,14 +407,8 @@ function resolveVersionConfig(versionRuntime) {
 
 function buildLaozhangUpstreamCandidates(upstreamPath) {
   if (!upstreamPath) return [];
-  if (!LAOZHANG_HOSTS.length) return [];
-
-  const out = [];
-  for (const host of LAOZHANG_HOSTS) {
-    if (!host) continue;
-    out.push(`https://${host}${upstreamPath}`);
-  }
-  return [...new Set(out)];
+  if (!LAOZHANG_PRIMARY_HOST) return [];
+  return [`https://${LAOZHANG_PRIMARY_HOST}${upstreamPath}`];
 }
 
 function buildLaozhangRequest(url) {
@@ -906,18 +901,14 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       req.body?.version || user?.[SUPABASE_VERSION_COLUMN]
     );
     const versionCfg = resolveVersionConfig(requestedVersion);
-    const requestedCount = Math.max(
-      1,
-      Math.min(4, Number.parseInt(req.body?.numberOfImages ?? 1, 10) || 1)
-    );
     const rawBalance = Number(user?.[versionCfg.balanceColumn]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
-    if (currentBalance < requestedCount) {
+    if (currentBalance < 1) {
       return res.status(402).json({
         error: "Недостаточно генераций. Пополните баланс.",
         code: "INSUFFICIENT_BALANCE",
         balance: currentBalance,
-        required: requestedCount,
+        required: 1,
       });
     }
 
@@ -934,8 +925,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
     if (!upstreamCandidates.length) {
       return res.status(500).json({
-        error:
-          "Не настроены хосты LAOZHANG_URL_1/LAOZHANG_URL_2/LAOZHANG_URL_3",
+        error: "Не настроен хост LAOZHANG_URL_1",
       });
     }
 
@@ -948,7 +938,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         delete imageCfg.aspectRatio;
       }
     }
-    const extractImageFromRaw = (rawData) => {
+    const extractImagesFromRaw = (rawData) => {
       const normalizeImageString = (value, fallbackMime = "image/png") => {
         if (typeof value !== "string" || !value.trim()) return null;
         const trimmed = value.trim();
@@ -969,17 +959,18 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         rawData?.candidates?.[0]?.content?.parts ||
         rawData?.data?.candidates?.[0]?.content?.parts ||
         [];
-      const imagePart = parts.find((part) => {
-        const inline = part?.inline_data || part?.inlineData;
-        return typeof inline?.data === "string";
-      });
-      if (imagePart) {
-        const inline = imagePart?.inline_data || imagePart?.inlineData;
-        const fromInline = {
-          imageData: inline?.data || null,
-          mimeType: inline?.mime_type || inline?.mimeType || "image/png",
-        };
-        if (fromInline.imageData) return fromInline;
+      const inlineImages = parts
+        .map((part) => {
+          const inline = part?.inline_data || part?.inlineData;
+          if (typeof inline?.data !== "string") return null;
+          return {
+            imageData: inline.data,
+            mimeType: inline?.mime_type || inline?.mimeType || "image/png",
+          };
+        })
+        .filter(Boolean);
+      if (inlineImages.length) {
+        return inlineImages;
       }
 
       const simpleCandidates = [
@@ -989,9 +980,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         normalizeImageString(rawData?.output?.[0]?.b64_json, "image/png"),
         normalizeImageString(rawData?.predictions?.[0]?.bytesBase64Encoded, "image/png"),
       ].filter(Boolean);
-      if (simpleCandidates.length) return simpleCandidates[0];
+      if (simpleCandidates.length) return simpleCandidates;
 
-      return null;
+      return [];
     };
 
     const generatedImages = [];
@@ -1004,65 +995,57 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return "Ошибка сервиса";
     };
 
-    for (let i = 0; i < requestedCount; i += 1) {
-      const upstreamPayload = {
-        ...upstreamPayloadBase,
-      };
-      let generatedItem = null;
-      let lastError = {
-        index: i + 1,
-        status: 502,
-        message: "Ошибка сервиса",
-      };
-
-      for (const candidateUrl of upstreamCandidates) {
-        try {
-          const { requestUrl, headers } = buildLaozhangRequest(candidateUrl);
-          const upstreamResponse = await fetch(requestUrl, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(upstreamPayload),
-          });
-          const raw = await upstreamResponse.json().catch(() => ({}));
-          if (!upstreamResponse.ok) {
-            lastError = {
-              index: i + 1,
-              status: upstreamResponse.status,
-              message: normalizeUpstreamErrorMessage(raw?.error || raw),
-            };
-            continue;
-          }
-
-          const extracted = extractImageFromRaw(raw);
-          if (!extracted?.imageData) {
-            lastError = {
-              index: i + 1,
-              status: 502,
-              message: "Сервис вернул ответ без изображения",
-            };
-            continue;
-          }
-
-          generatedItem = {
-            imageData: extracted.imageData,
-            mimeType: extracted.mimeType,
-            raw,
-          };
-          break;
-        } catch (error) {
+    const upstreamPayload = {
+      ...upstreamPayloadBase,
+    };
+    const candidateUrl = upstreamCandidates[0];
+    let lastError = {
+      index: 1,
+      status: 502,
+      message: "Ошибка сервиса",
+    };
+    try {
+      const { requestUrl, headers } = buildLaozhangRequest(candidateUrl);
+      const upstreamResponse = await fetch(requestUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(upstreamPayload),
+      });
+      const raw = await upstreamResponse.json().catch(() => ({}));
+      if (!upstreamResponse.ok) {
+        lastError = {
+          index: 1,
+          status: upstreamResponse.status,
+          message: normalizeUpstreamErrorMessage(raw?.error || raw),
+        };
+      } else {
+        const extractedImages = extractImagesFromRaw(raw);
+        if (!extractedImages.length) {
           lastError = {
-            index: i + 1,
-            status: 503,
-            message: error?.message || "Ошибка сервиса",
+            index: 1,
+            status: 502,
+            message: "Сервис вернул ответ без изображения",
           };
+        } else {
+          for (const item of extractedImages) {
+            generatedImages.push({
+              imageData: item.imageData,
+              mimeType: item.mimeType,
+              raw,
+            });
+          }
         }
       }
+    } catch (error) {
+      lastError = {
+        index: 1,
+        status: 503,
+        message: error?.message || "Ошибка сервиса",
+      };
+    }
 
-      if (generatedItem) {
-        generatedImages.push(generatedItem);
-      } else {
-        generationErrors.push(lastError);
-      }
+    if (!generatedImages.length) {
+      generationErrors.push(lastError);
     }
 
     if (!generatedImages.length) {
@@ -1074,8 +1057,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     let nextBalance = null;
+    const chargedCount = generatedImages.length ? 1 : 0;
     if (supabase) {
-      nextBalance = Math.max(0, currentBalance - generatedImages.length);
+      nextBalance = Math.max(0, currentBalance - chargedCount);
       const { error: updateError } = await supabase
         .from(SUPABASE_USERS_TABLE)
         .update({
@@ -1098,10 +1082,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       })),
       raw: generatedImages[0].raw,
       balance: nextBalance,
-      charged: generatedImages.length,
-      requested: requestedCount,
-      partial: generatedImages.length < requestedCount,
-      failed: requestedCount - generatedImages.length,
+      charged: chargedCount,
+      requested: generatedImages.length,
+      partial: false,
+      failed: 0,
       errors: generationErrors,
       version: versionCfg.versionRuntime,
     });
