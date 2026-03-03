@@ -906,6 +906,12 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
     delete upstreamPayloadBase.numberOfImages;
+    if (upstreamPayloadBase?.generationConfig?.imageConfig) {
+      const imageCfg = upstreamPayloadBase.generationConfig.imageConfig;
+      if (typeof imageCfg.aspectRatio === "string" && !imageCfg.aspectRatio.trim()) {
+        delete imageCfg.aspectRatio;
+      }
+    }
     const extractImageFromRaw = (rawData) => {
       const parts =
         rawData?.candidates?.[0]?.content?.parts ||
@@ -939,7 +945,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     for (let i = 0; i < requestedCount; i += 1) {
       const upstreamPayload = {
         ...upstreamPayloadBase,
-        numberOfImages: 1,
       };
       let generatedItem = null;
       let lastError = {
