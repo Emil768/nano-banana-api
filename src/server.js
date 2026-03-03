@@ -111,15 +111,15 @@ const normalizeLaozhangEndpoint = (value, fallback) => {
 const LAOZHANG_URL =
   normalizeLaozhangEndpoint(
     process.env.LAOZHANG_URL,
-    "https://api.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent"
+    "https://api-vip.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent"
   ) ||
-  "https://api.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent";
+  "https://api-vip.laozhang.ai/v1beta/models/gemini-3-pro-image-preview:generateContent";
 const LAOZHANG_URL_FREE =
   normalizeLaozhangEndpoint(
     process.env.LAOZHANG_URL_FREE,
-    "https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent"
+    "https://api-vip.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent"
   ) ||
-  "https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent";
+  "https://api-vip.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent";
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
 const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
