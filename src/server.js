@@ -641,12 +641,14 @@ async function checkPromptWithOpenRouter(prompt) {
             role: "system",
             content:
               "Ты проверяешь текстовые промпты перед генерацией изображений. " +
-              "Определи, стоит ли блокировать запрос до генерации. " +
-              "Считай высокорискованными: minors/дети в чувствительном контексте, nudity/sexual content, " +
-              "graphic violence, gore, exploitative content, watermark removal, copyright removal, " +
-              "PII/личные данные, harmful deepfake-like edits реальных людей и другие явно рискованные кейсы. " +
-              "Не блокируй только потому, что упомянут бренд, персонаж или знаменитость. " +
-              "Если промпт можно безопасно переформулировать, предложи короткую безопасную версию на русском.",
+              "Нужно блокировать только 18+ сексуальный/эротический контент. " +
+              "НЕ блокируй бренды, логотипы, fashion, editorial, luxury, woman, man, clothes, animals, рекламу, знаменитостей, стили, сцены, позы, если там нет сексуального или эротического контекста. " +
+              "НЕ блокируй наготу, если её нет явно в запросе. " +
+              "Блокируй только если есть явные признаки: голая/обнажённая грудь, голое тело, нагота, nude, naked, erotic, sex, sexual content, fetish, nipples, vagina, penis, explicit adult content, porn, blowjob, intercourse, orgasm, masturbation, spread legs with nudity, see-through clothes with erotic intent, снять одежду, раздеть, без одежды, полностью голая. " +
+              "Если контент безопасный, верни shouldBlock=false, safe=true, reasons=[]. " +
+              "Если нужно блокировать, reasons должны быть короткими и только по сексуальному 18+ контенту. " +
+              "НЕ предлагай переписанный промпт: suggestedRewrite всегда должен быть null. " +
+              "shortMessageRu должен быть пустым для safe prompt и понятным коротким сообщением для blocked prompt.",
           },
           {
             role: "user",
@@ -673,7 +675,16 @@ async function checkPromptWithOpenRouter(prompt) {
   return {
     ok: true,
     model: data?.model || OPENROUTER_MODEL,
-    ...parsed,
+    safe: Boolean(parsed?.safe),
+    shouldBlock: Boolean(parsed?.shouldBlock),
+    riskLevel: parsed?.riskLevel || "low",
+    reasons: Array.isArray(parsed?.reasons) ? parsed.reasons : [],
+    suggestedRewrite: null,
+    shortMessageRu:
+      parsed?.shortMessageRu ||
+      (parsed?.shouldBlock
+        ? "Запрос содержит 18+ контент и не может быть отправлен в генерацию."
+        : ""),
   };
 }
 
@@ -1090,14 +1101,16 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
       if (moderation.shouldBlock) {
         return res.status(422).json({
-          error: moderation.shortMessageRu || "Промпт не прошёл проверку.",
+          error:
+            moderation.shortMessageRu ||
+            "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
           code: "PROMPT_BLOCKED",
           moderation: {
             safe: moderation.safe,
             shouldBlock: moderation.shouldBlock,
             riskLevel: moderation.riskLevel,
             reasons: moderation.reasons,
-            suggestedRewrite: moderation.suggestedRewrite,
+            suggestedRewrite: null,
             model: moderation.model,
           },
         });
