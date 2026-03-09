@@ -1138,7 +1138,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
-    delete upstreamPayloadBase.numberOfImages;
 
     if (upstreamPayloadBase?.generationConfig?.imageConfig) {
       const imageCfg = upstreamPayloadBase.generationConfig.imageConfig;
@@ -1281,7 +1280,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     let nextBalance = null;
-    const chargedCount = generatedImages.length ? 1 : 0;
+    const chargedCount = generatedImages.length;
 
     if (supabase) {
       nextBalance = Math.max(0, currentBalance - chargedCount);
@@ -1309,9 +1308,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       raw: generatedImages[0].raw,
       balance: nextBalance,
       charged: chargedCount,
-      requested: generatedImages.length,
-      partial: false,
-      failed: 0,
+      requested: requestedCount,
+      partial: generatedImages.length < requestedCount,
+      failed: Math.max(0, requestedCount - generatedImages.length),
       errors: generationErrors,
       version: versionCfg.versionRuntime,
     });
