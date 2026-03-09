@@ -9,6 +9,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
+
 const normalizeEnv = (value, fallback = "") => {
   const raw = (value ?? "").toString().trim();
   if (!raw) return fallback;
@@ -19,6 +20,7 @@ const FRONTEND_ORIGIN = normalizeEnv(
   process.env.FRONTEND_ORIGIN,
   "https://nanobananaa.ru"
 );
+
 const ALLOWED_ORIGINS = normalizeEnv(
   process.env.ALLOWED_ORIGINS,
   FRONTEND_ORIGIN
@@ -26,9 +28,11 @@ const ALLOWED_ORIGINS = normalizeEnv(
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+
 const FRONTEND_SUCCESS_REDIRECT =
   normalizeEnv(process.env.FRONTEND_SUCCESS_REDIRECT) ||
   `${FRONTEND_ORIGIN}/generate.html`;
+
 const FRONTEND_ERROR_REDIRECT =
   normalizeEnv(process.env.FRONTEND_ERROR_REDIRECT) ||
   `${FRONTEND_ORIGIN}/generate.html?auth_error=1`;
@@ -123,12 +127,14 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
   "bearer"
 ).toLowerCase();
+
 const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
 const LAOZHANG_HOSTS = [
   normalizeLaozhangHost(process.env.LAOZHANG_URL_1),
   normalizeLaozhangHost(process.env.LAOZHANG_URL_2),
   normalizeLaozhangHost(process.env.LAOZHANG_URL_3),
 ].filter(Boolean);
+
 const PAYMENT_PROVIDER_URL =
   normalizeEnv(process.env.PAYMENT_PROVIDER_URL) ||
   "https://app.platega.io/transaction/process";
@@ -167,6 +173,9 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
   "x-webhook-secret"
 );
 
+const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
+const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.warn(
     "SUPABASE_URL или SUPABASE_SERVICE_ROLE_KEY не задан. Проверка юзера отключится."
@@ -179,6 +188,7 @@ const supabase =
         auth: { persistSession: false },
       })
     : null;
+
 const sseClientsByChatId = new Map();
 
 app.set("trust proxy", 1);
@@ -205,9 +215,10 @@ function signTelegramDataCheck(dataObj, botToken) {
     )
     .sort()
     .map((k) => `${k}=${dataObj[k]}`);
-  const dataCheckString = sortedPairs.join("\n");
 
+  const dataCheckString = sortedPairs.join("\n");
   const secretKey = crypto.createHash("sha256").update(botToken).digest();
+
   return crypto
     .createHmac("sha256", secretKey)
     .update(dataCheckString)
@@ -215,39 +226,45 @@ function signTelegramDataCheck(dataObj, botToken) {
 }
 
 function isTelegramAuthDataValid(query) {
-  if (!TELEGRAM_BOT_TOKEN)
+  if (!TELEGRAM_BOT_TOKEN) {
     return { valid: false, reason: "bot token not configured" };
-  if (!query.hash) return { valid: false, reason: "no hash" };
+  }
+
+  if (!query.hash) {
+    return { valid: false, reason: "no hash" };
+  }
 
   const expectedHash = signTelegramDataCheck(query, TELEGRAM_BOT_TOKEN);
-  if (expectedHash !== query.hash)
+  if (expectedHash !== query.hash) {
     return { valid: false, reason: "hash mismatch" };
+  }
 
   const authDate = Number(query.auth_date || 0);
-  if (!authDate) return { valid: false, reason: "no auth_date" };
+  if (!authDate) {
+    return { valid: false, reason: "no auth_date" };
+  }
 
   const ageSeconds = Math.floor(Date.now() / 1000) - authDate;
   if (ageSeconds > TELEGRAM_WIDGET_MAX_AGE_SECONDS) {
     return { valid: false, reason: "auth_date expired" };
   }
+
   return { valid: true };
 }
 
 function setChatCookies(req, res, chatId) {
   const isLocalHost =
     req.hostname === "127.0.0.1" || req.hostname === "localhost";
+
   const common = {
     secure: isLocalHost ? false : COOKIE_SECURE,
-    // Chrome rejects SameSite=None cookies without Secure on local http.
     sameSite: isLocalHost ? "Lax" : COOKIE_SAMESITE,
     domain: COOKIE_DOMAIN,
     maxAge: COOKIE_MAX_AGE_SECONDS * 1000,
     path: "/",
   };
 
-  // This cookie is readable by frontend to keep current flow working.
   res.cookie("chatid", String(chatId), { ...common, httpOnly: false });
-  // Session marker cookie for backend checks.
   res.cookie("tg_session", "1", { ...common, httpOnly: true });
 }
 
@@ -265,26 +282,36 @@ function createSessionToken(chatId) {
 
 function verifySessionToken(tokenValue) {
   if (!AUTH_SESSION_SECRET || !tokenValue) return null;
+
   const token = String(tokenValue || "").trim();
   const [chatIdRaw, expRaw, sigRaw] = token.split(".");
+
   if (!chatIdRaw || !expRaw || !sigRaw) return null;
+
   const exp = Number(expRaw);
-  if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) return null;
+  if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+
   const base = `${chatIdRaw}.${expRaw}`;
   const expectedSig = crypto
     .createHmac("sha256", AUTH_SESSION_SECRET)
     .update(base)
     .digest("hex");
+
   const expectedBuf = Buffer.from(expectedSig, "hex");
   const sigBuf = Buffer.from(String(sigRaw), "hex");
+
   if (expectedBuf.length !== sigBuf.length) return null;
   if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
+
   return String(chatIdRaw);
 }
 
 function buildSuccessRedirectUrl(chatId) {
   const token = createSessionToken(chatId);
   if (!token) return FRONTEND_SUCCESS_REDIRECT;
+
   try {
     const target = new URL(FRONTEND_SUCCESS_REDIRECT);
     target.searchParams.set("session", token);
@@ -299,6 +326,7 @@ function buildSuccessRedirectUrl(chatId) {
 
 async function getUserByChatId(chatId) {
   if (!supabase) return null;
+
   const { data, error } = await supabase
     .from(SUPABASE_USERS_TABLE)
     .select("*")
@@ -311,6 +339,7 @@ async function getUserByChatId(chatId) {
 
 async function createUserIfMissing(chatId) {
   if (!supabase) return null;
+
   const insertPayload = {
     [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
     [SUPABASE_BALANCE_COLUMN]: 1,
@@ -323,17 +352,20 @@ async function createUserIfMissing(chatId) {
     status: "null",
     style_photo: "empty",
   };
+
   const { data, error } = await supabase
     .from(SUPABASE_USERS_TABLE)
     .insert(insertPayload)
     .select("*")
     .single();
+
   if (error) throw error;
   return data;
 }
 
 async function getPricingPlanById(planId, tableName = SUPABASE_PRICES_TABLE) {
   if (!supabase) return null;
+
   const { data, error } = await supabase
     .from(tableName)
     .select("*")
@@ -346,10 +378,12 @@ async function getPricingPlanById(planId, tableName = SUPABASE_PRICES_TABLE) {
 
 async function getPricingPlans(tableName = SUPABASE_PRICES_TABLE) {
   if (!supabase) return [];
+
   const { data, error } = await supabase
     .from(tableName)
     .select("*")
     .order(SUPABASE_PRICE_ID_COLUMN, { ascending: true });
+
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }
@@ -369,9 +403,11 @@ function parseWebhookPayload(payloadValue) {
   const paymentIdRaw = parts[parts.length - 1];
   const chatId = Number(chatIdRaw);
   const paymentId = Number(paymentIdRaw);
+
   if (!Number.isFinite(chatId) || !Number.isFinite(paymentId)) {
     return null;
   }
+
   return {
     chatId: String(chatId),
     paymentId,
@@ -396,6 +432,7 @@ function resolveVersionConfig(versionRuntime) {
       upstreamPath: LAOZHANG_URL_FREE,
     };
   }
+
   return {
     versionRuntime: "pro",
     versionStorage: "PRO",
@@ -417,7 +454,9 @@ function buildLaozhangRequest(url) {
 
   if (LAOZHANG_AUTH_MODE === "query") {
     const glue = requestUrl.includes("?") ? "&" : "?";
-    requestUrl = `${requestUrl}${glue}key=${encodeURIComponent(LAOZHANG_API_KEY)}`;
+    requestUrl = `${requestUrl}${glue}key=${encodeURIComponent(
+      LAOZHANG_API_KEY
+    )}`;
   } else {
     headers.Authorization = `Bearer ${LAOZHANG_API_KEY}`;
   }
@@ -442,9 +481,11 @@ function resolvePaymentProviderHeaders() {
     providerHeaders[PAYMENT_PROVIDER_MERCHANT_HEADER] =
       PAYMENT_PROVIDER_MERCHANT_ID;
   }
+
   if (PAYMENT_PROVIDER_SECRET) {
     providerHeaders[PAYMENT_PROVIDER_SECRET_HEADER] = PAYMENT_PROVIDER_SECRET;
   }
+
   if (PAYMENT_PROVIDER_API_KEY) {
     if (PAYMENT_PROVIDER_AUTH_MODE === "bearer") {
       providerHeaders.Authorization = `Bearer ${PAYMENT_PROVIDER_API_KEY}`;
@@ -474,11 +515,13 @@ function resolvePaymentUrl(raw) {
 function emitSseEvent(chatId, eventName, payload = {}) {
   const subscribers = sseClientsByChatId.get(String(chatId));
   if (!subscribers?.size) return;
+
   const eventPayload = JSON.stringify({
     chat_id: String(chatId),
     ts: Date.now(),
     ...payload,
   });
+
   subscribers.forEach((client) => {
     client.write(`event: ${eventName}\ndata: ${eventPayload}\n\n`);
   });
@@ -486,26 +529,22 @@ function emitSseEvent(chatId, eventName, payload = {}) {
 
 function resolveChatIdFromRequest(req, options = {}) {
   const { allowQuerySession = false } = options;
+
   const chatIdFromCookie = req.cookies?.chatid;
-  if (chatIdFromCookie) {
-    return String(chatIdFromCookie);
-  }
+  if (chatIdFromCookie) return String(chatIdFromCookie);
 
   const authHeader = String(req.headers.authorization || "");
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice(7).trim()
     : "";
+
   const chatIdFromToken = verifySessionToken(token);
-  if (chatIdFromToken) {
-    return String(chatIdFromToken);
-  }
+  if (chatIdFromToken) return String(chatIdFromToken);
 
   if (allowQuerySession) {
     const queryToken = String(req.query?.session || "").trim();
     const chatIdFromQueryToken = verifySessionToken(queryToken);
-    if (chatIdFromQueryToken) {
-      return String(chatIdFromQueryToken);
-    }
+    if (chatIdFromQueryToken) return String(chatIdFromQueryToken);
   }
 
   return "";
@@ -518,8 +557,124 @@ function requireChatId(req, res, next) {
       .status(401)
       .json({ error: "Не авторизован. Войди через Telegram." });
   }
+
   req.chatId = String(chatId);
   next();
+}
+
+function extractPromptText(body = {}) {
+  const directCandidates = [
+    body?.prompt,
+    body?.text,
+    body?.input,
+    body?.contents?.[0]?.parts
+      ?.map((p) => p?.text)
+      .filter(Boolean)
+      .join(" "),
+  ].filter((value) => typeof value === "string" && value.trim());
+
+  return directCandidates[0] || "";
+}
+
+async function checkPromptWithOpenRouter(prompt) {
+  if (!OPENROUTER_API_KEY) {
+    return {
+      ok: true,
+      safe: true,
+      shouldBlock: false,
+      riskLevel: "low",
+      reasons: [],
+      suggestedRewrite: null,
+      shortMessageRu: "",
+      model: null,
+    };
+  }
+
+  const schema = {
+    name: "prompt_safety_check",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        safe: { type: "boolean" },
+        shouldBlock: { type: "boolean" },
+        riskLevel: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+        },
+        reasons: {
+          type: "array",
+          items: { type: "string" },
+        },
+        suggestedRewrite: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+        },
+        shortMessageRu: { type: "string" },
+      },
+      required: [
+        "safe",
+        "shouldBlock",
+        "riskLevel",
+        "reasons",
+        "suggestedRewrite",
+        "shortMessageRu",
+      ],
+      additionalProperties: false,
+    },
+  };
+
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": FRONTEND_ORIGIN,
+        "X-Title": "NanoBanana Prompt Filter",
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Ты проверяешь текстовые промпты перед генерацией изображений. " +
+              "Определи, стоит ли блокировать запрос до генерации. " +
+              "Считай высокорискованными: minors/дети в чувствительном контексте, nudity/sexual content, " +
+              "graphic violence, gore, exploitative content, watermark removal, copyright removal, " +
+              "PII/личные данные, harmful deepfake-like edits реальных людей и другие явно рискованные кейсы. " +
+              "Не блокируй только потому, что упомянут бренд, персонаж или знаменитость. " +
+              "Если промпт можно безопасно переформулировать, предложи короткую безопасную версию на русском.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: schema,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`OpenRouter error ${response.status}: ${raw}`);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  const parsed = JSON.parse(content);
+
+  return {
+    ok: true,
+    model: data?.model || OPENROUTER_MODEL,
+    ...parsed,
+  };
 }
 
 app.get("/health", (_req, res) => {
@@ -561,15 +716,14 @@ app.get("/api/events", (req, res) => {
     const active = sseClientsByChatId.get(chatId);
     if (!active) return;
     active.delete(res);
-    if (!active.size) {
-      sseClientsByChatId.delete(chatId);
-    }
+    if (!active.size) sseClientsByChatId.delete(chatId);
   });
 });
 
 app.get("/auth/telegram/callback", async (req, res) => {
   try {
     const check = isTelegramAuthDataValid(req.query);
+
     if (!check.valid) {
       return res.redirect(
         `${FRONTEND_ERROR_REDIRECT}&reason=${encodeURIComponent(check.reason)}`
@@ -582,7 +736,7 @@ app.get("/auth/telegram/callback", async (req, res) => {
     }
 
     let user = await getUserByChatId(chatId);
-    if (!user) {
+    if (!user && AUTO_CREATE_USER) {
       user = await createUserIfMissing(chatId);
     }
 
@@ -597,14 +751,17 @@ app.get("/auth/telegram/callback", async (req, res) => {
 app.get("/auth/me", requireChatId, async (req, res) => {
   try {
     let user = await getUserByChatId(req.chatId);
-    if (!user) {
+
+    if (!user && AUTO_CREATE_USER) {
       user = await createUserIfMissing(req.chatId);
-      if (!user) {
-        return res
-          .status(401)
-          .json({ authenticated: false, error: "Пользователь не найден" });
-      }
     }
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ authenticated: false, error: "Пользователь не найден" });
+    }
+
     return res.json({
       authenticated: true,
       chat_id: req.chatId,
@@ -632,6 +789,7 @@ app.post("/auth/logout", (_req, res) => {
     domain: COOKIE_DOMAIN,
     path: "/",
   };
+
   res.clearCookie("chatid", base);
   res.clearCookie("tg_session", base);
   res.json({ ok: true });
@@ -642,12 +800,15 @@ app.post("/api/version", requireChatId, async (req, res) => {
     if (!supabase) {
       return res.status(500).json({ error: "Supabase не настроен" });
     }
+
     const versionRuntime = normalizeVersionRuntime(req.body?.version);
     const versionStorage = normalizeVersionStorage(req.body?.version);
+
     const { error } = await supabase
       .from(SUPABASE_USERS_TABLE)
       .update({ [SUPABASE_VERSION_COLUMN]: versionStorage })
       .eq(SUPABASE_CHAT_ID_COLUMN, req.chatId);
+
     if (error) {
       if (error?.code === "PGRST204") {
         return res.status(400).json({
@@ -656,6 +817,7 @@ app.post("/api/version", requireChatId, async (req, res) => {
       }
       throw error;
     }
+
     return res.json({ ok: true, version: versionRuntime });
   } catch (error) {
     console.error("version update error", error);
@@ -668,6 +830,7 @@ app.get("/api/pricing", requireChatId, async (req, res) => {
     const version = normalizeVersionRuntime(req.query?.version);
     const versionCfg = resolveVersionConfig(version);
     const plans = await getPricingPlans(versionCfg.pricesTable);
+
     return res.json({
       version: versionCfg.versionRuntime,
       plans: plans.map(mapPlanForFrontend),
@@ -692,17 +855,20 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
     const requestedVersion = normalizeVersionRuntime(req.body?.version);
     const versionCfg = resolveVersionConfig(requestedVersion);
     const plan = await getPricingPlanById(planId, versionCfg.pricesTable);
+
     if (!plan) {
       return res.status(404).json({ error: "Тариф не найден" });
     }
 
     const generations = Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0);
     const amount = Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0);
+
     if (!Number.isFinite(generations) || generations <= 0) {
       return res
         .status(400)
         .json({ error: "Некорректное количество генераций" });
     }
+
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: "Некорректная сумма тарифа" });
     }
@@ -722,10 +888,10 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
     };
 
     const providerHeaders = resolvePaymentProviderHeaders();
-
     const missingProviderCredentials =
       !providerHeaders[PAYMENT_PROVIDER_MERCHANT_HEADER] ||
       !providerHeaders[PAYMENT_PROVIDER_SECRET_HEADER];
+
     if (missingProviderCredentials) {
       return res.status(500).json({
         error:
@@ -750,7 +916,6 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
     }
 
     const paymentUrl = resolvePaymentUrl(raw);
-
     if (!paymentUrl) {
       return res.status(502).json({
         error: "Провайдер не вернул ссылку на оплату",
@@ -783,19 +948,21 @@ app.post("/api/webhooks/platega", async (req, res) => {
     const statusRaw =
       body?.status || body?.payment_status || body?.state || body?.event || "";
     const status = String(statusRaw).toLowerCase();
+
     const payloadValue =
       body?.payload ||
       body?.data?.payload ||
       body?.object?.payload ||
       body?.transaction?.payload;
+
     const parsed = parseWebhookPayload(payloadValue);
     if (!parsed) {
       return res.status(400).json({ error: "invalid payload format" });
     }
+
     const { chatId, paymentId } = parsed;
 
-    const isPending = status === "pending";
-    if (isPending) {
+    if (status === "pending") {
       emitSseEvent(chatId, "payment_pending", {
         type: "payment_pending",
         status,
@@ -804,8 +971,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.json({ ok: true, pending: true, status });
     }
 
-    const isFailure = ["canceled", "chargebacked"].includes(status);
-    if (isFailure) {
+    if (["canceled", "chargebacked"].includes(status)) {
       emitSseEvent(chatId, "payment_failed", {
         type: "payment_failed",
         status,
@@ -814,8 +980,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.json({ ok: true, ignored: true, status });
     }
 
-    const isSuccess = status === "confirmed";
-    if (!isSuccess) {
+    if (status !== "confirmed") {
       emitSseEvent(chatId, "payment_failed", {
         type: "payment_failed",
         status: status || "unknown",
@@ -823,15 +988,18 @@ app.post("/api/webhooks/platega", async (req, res) => {
       });
       return res.json({ ok: true, ignored: true, status });
     }
+
     const user = await getUserByChatId(chatId);
     if (!user) {
       return res.status(404).json({ error: "user not found" });
     }
+
     const selectedVersion = normalizeVersionRuntime(
       user?.[SUPABASE_VERSION_COLUMN]
     );
     const versionCfg = resolveVersionConfig(selectedVersion);
     const plan = await getPricingPlanById(paymentId, versionCfg.pricesTable);
+
     if (!plan) {
       return res.status(404).json({ error: "pricing plan not found" });
     }
@@ -844,6 +1012,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
     const nextBalance = Number.isFinite(currentBalance)
       ? currentBalance + (Number.isFinite(generations) ? generations : 0)
       : generations;
+
     const nextTotalSum = Number.isFinite(currentTotalSum)
       ? currentTotalSum + (Number.isFinite(priceRub) ? priceRub : 0)
       : priceRub;
@@ -888,13 +1057,14 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     let user = await getUserByChatId(req.chatId);
-    if (!user) {
+    if (!user && AUTO_CREATE_USER) {
       user = await createUserIfMissing(req.chatId);
-      if (!user) {
-        return res
-          .status(401)
-          .json({ error: "Пользователь не найден в Supabase" });
-      }
+    }
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: "Пользователь не найден в Supabase" });
     }
 
     const requestedVersion = normalizeVersionRuntime(
@@ -903,6 +1073,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const versionCfg = resolveVersionConfig(requestedVersion);
     const rawBalance = Number(user?.[versionCfg.balanceColumn]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
+
     if (currentBalance < 1) {
       return res.status(402).json({
         error: "Недостаточно генераций. Пополните баланс.",
@@ -912,17 +1083,40 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
+    const promptText = extractPromptText(req.body);
+
+    if (promptText.trim()) {
+      const moderation = await checkPromptWithOpenRouter(promptText);
+
+      if (moderation.shouldBlock) {
+        return res.status(422).json({
+          error: moderation.shortMessageRu || "Промпт не прошёл проверку.",
+          code: "PROMPT_BLOCKED",
+          moderation: {
+            safe: moderation.safe,
+            shouldBlock: moderation.shouldBlock,
+            riskLevel: moderation.riskLevel,
+            reasons: moderation.reasons,
+            suggestedRewrite: moderation.suggestedRewrite,
+            model: moderation.model,
+          },
+        });
+      }
+    }
+
     const upstreamCandidates = buildLaozhangUpstreamCandidates(
       versionCfg.upstreamPath
     );
+
     if (!versionCfg.upstreamPath) {
       return res.status(500).json({
         error:
           requestedVersion === "free"
-            ? "LAOZHANG_URL_FREE не настроен"
+            ? "LAОZHANG_URL_FREE не настроен"
             : "LAOZHANG_URL не настроен",
       });
     }
+
     if (!upstreamCandidates.length) {
       return res.status(500).json({
         error: "Не настроен хост LAOZHANG_URL_1",
@@ -932,23 +1126,31 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
     delete upstreamPayloadBase.numberOfImages;
+
     if (upstreamPayloadBase?.generationConfig?.imageConfig) {
       const imageCfg = upstreamPayloadBase.generationConfig.imageConfig;
-      if (typeof imageCfg.aspectRatio === "string" && !imageCfg.aspectRatio.trim()) {
+      if (
+        typeof imageCfg.aspectRatio === "string" &&
+        !imageCfg.aspectRatio.trim()
+      ) {
         delete imageCfg.aspectRatio;
       }
     }
+
     const extractImagesFromRaw = (rawData) => {
       const normalizeImageString = (value, fallbackMime = "image/png") => {
         if (typeof value !== "string" || !value.trim()) return null;
+
         const trimmed = value.trim();
         const dataUrlMatch = trimmed.match(/^data:(.+?);base64,(.+)$/i);
+
         if (dataUrlMatch) {
           return {
             imageData: dataUrlMatch[2],
             mimeType: dataUrlMatch[1] || fallbackMime,
           };
         }
+
         return {
           imageData: trimmed,
           mimeType: fallbackMime,
@@ -959,6 +1161,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         rawData?.candidates?.[0]?.content?.parts ||
         rawData?.data?.candidates?.[0]?.content?.parts ||
         [];
+
       const inlineImages = parts
         .map((part) => {
           const inline = part?.inline_data || part?.inlineData;
@@ -969,28 +1172,32 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           };
         })
         .filter(Boolean);
-      if (inlineImages.length) {
-        return inlineImages;
-      }
+
+      if (inlineImages.length) return inlineImages;
 
       const simpleCandidates = [
         normalizeImageString(rawData?.imageData, "image/png"),
         normalizeImageString(rawData?.image, "image/png"),
         normalizeImageString(rawData?.data?.[0]?.b64_json, "image/png"),
         normalizeImageString(rawData?.output?.[0]?.b64_json, "image/png"),
-        normalizeImageString(rawData?.predictions?.[0]?.bytesBase64Encoded, "image/png"),
+        normalizeImageString(
+          rawData?.predictions?.[0]?.bytesBase64Encoded,
+          "image/png"
+        ),
       ].filter(Boolean);
-      if (simpleCandidates.length) return simpleCandidates;
 
+      if (simpleCandidates.length) return simpleCandidates;
       return [];
     };
 
     const generatedImages = [];
     const generationErrors = [];
+
     const normalizeUpstreamErrorMessage = (rawError) => {
       if (typeof rawError === "string" && rawError.trim()) return rawError;
       if (rawError?.message) return String(rawError.message);
-      if (rawError?.localized_message) return String(rawError.localized_message);
+      if (rawError?.localized_message)
+        return String(rawError.localized_message);
       if (rawError?.type) return String(rawError.type);
       return "Ошибка сервиса";
     };
@@ -998,20 +1205,26 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const upstreamPayload = {
       ...upstreamPayloadBase,
     };
+
     const candidateUrl = upstreamCandidates[0];
+
     let lastError = {
       index: 1,
       status: 502,
       message: "Ошибка сервиса",
     };
+
     try {
       const { requestUrl, headers } = buildLaozhangRequest(candidateUrl);
+
       const upstreamResponse = await fetch(requestUrl, {
         method: "POST",
         headers,
         body: JSON.stringify(upstreamPayload),
       });
+
       const raw = await upstreamResponse.json().catch(() => ({}));
+
       if (!upstreamResponse.ok) {
         lastError = {
           index: 1,
@@ -1020,6 +1233,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         };
       } else {
         const extractedImages = extractImagesFromRaw(raw);
+
         if (!extractedImages.length) {
           lastError = {
             index: 1,
@@ -1046,9 +1260,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     if (!generatedImages.length) {
       generationErrors.push(lastError);
-    }
-
-    if (!generatedImages.length) {
       return res.status(502).json({
         error: "Ошибка генерации, попробуйте еще раз через 10 секунд",
         code: "GENERATION_FAILED_ALL",
@@ -1058,8 +1269,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     let nextBalance = null;
     const chargedCount = generatedImages.length ? 1 : 0;
+
     if (supabase) {
       nextBalance = Math.max(0, currentBalance - chargedCount);
+
       const { error: updateError } = await supabase
         .from(SUPABASE_USERS_TABLE)
         .update({
@@ -1101,10 +1314,18 @@ app.listen(PORT, () => {
       ","
     )}`
   );
+
   console.log(
     `Payments: provider=${PAYMENT_PROVIDER_URL}, authMode=${PAYMENT_PROVIDER_AUTH_MODE}, return=${PAYMENT_RETURN_URL}, merchant=${
       PAYMENT_PROVIDER_MERCHANT_ID ? "set" : "missing"
     }, secret=${PAYMENT_PROVIDER_SECRET ? "set" : "missing"}`
   );
+
+  console.log(
+    `Prompt filter: model=${OPENROUTER_MODEL}, openrouterKey=${
+      OPENROUTER_API_KEY ? "set" : "missing"
+    }`
+  );
+
   console.log(`Backend started on port ${PORT}`);
 });
