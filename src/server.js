@@ -1084,6 +1084,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const versionCfg = resolveVersionConfig(requestedVersion);
     const rawBalance = Number(user?.[versionCfg.balanceColumn]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
+    const requestedCount = Math.max(1, Number(req.body?.numberOfImages || 1));
 
     if (currentBalance < 1) {
       return res.status(402).json({
