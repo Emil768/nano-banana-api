@@ -1086,7 +1086,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
     const requestedCount = Math.max(1, Number(req.body?.numberOfImages || 1));
 
-    if (currentBalance < 1) {
+    if (currentBalance < requestedCount) {
       return res.status(402).json({
         error: "Недостаточно генераций. Пополните баланс.",
         code: "INSUFFICIENT_BALANCE",
