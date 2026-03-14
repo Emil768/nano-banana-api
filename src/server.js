@@ -5,7 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 
-import promptsLibrary from "./prompts.json" assert { type: "json" };
+import promptsLibrary from "./prompts.json" with { type: "json" };
 
 dotenv.config();
 
