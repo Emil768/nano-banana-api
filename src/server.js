@@ -5,6 +5,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 
+import promptsLibrary from "./prompts.json" assert { type: "json" };
+
 dotenv.config();
 
 const app = express();
@@ -582,11 +584,7 @@ async function checkPromptWithOpenRouter(prompt) {
       ok: true,
       safe: true,
       shouldBlock: false,
-      riskLevel: "low",
-      reasons: [],
-      suggestedRewrite: null,
-      shortMessageRu: "",
-      model: null,
+      hasClearIntent: true,
     };
   }
 
@@ -639,16 +637,15 @@ async function checkPromptWithOpenRouter(prompt) {
         messages: [
           {
             role: "system",
-            content:
-              "Ты проверяешь текстовые промпты перед генерацией изображений. " +
-              "Нужно блокировать только 18+ сексуальный/эротический контент. " +
-              "НЕ блокируй бренды, логотипы, fashion, editorial, luxury, woman, man, clothes, animals, рекламу, знаменитостей, стили, сцены, позы, если там нет сексуального или эротического контекста. " +
-              "НЕ блокируй наготу, если её нет явно в запросе. " +
-              "Блокируй только если есть явные признаки: голая/обнажённая грудь, голое тело, нагота, nude, naked, erotic, sex, sexual content, fetish, nipples, vagina, penis, explicit adult content, porn, blowjob, intercourse, orgasm, masturbation, spread legs with nudity, see-through clothes with erotic intent, снять одежду, раздеть, без одежды, полностью голая. " +
-              "Если контент безопасный, верни shouldBlock=false, safe=true, reasons=[]. " +
-              "Если нужно блокировать, reasons должны быть короткими и только по сексуальному 18+ контенту. " +
-              "НЕ предлагай переписанный промпт: suggestedRewrite всегда должен быть null. " +
-              "shortMessageRu должен быть пустым для safe prompt и понятным коротким сообщением для blocked prompt.",
+            content: `Проверь текстовый prompt для генерации изображения.
+            Верни только JSON:
+            {"shouldBlock":false,"hasClearIntent":true}
+
+          Правила:
+          - shouldBlock=true, если запрос содержит 18+, porn, явную сексуализацию, наготу, fetish, incest, bestiality или другой запрещённый сексуальный контент.
+          - hasClearIntent=false, если это бессмысленный набор символов, случайные буквы, мусорный текст или слишком расплывчатый запрос, по которому непонятно, что рисовать.
+          - Короткие, но понятные запросы (например "кот в шляпе") считаются нормальными.
+          - Ничего кроме JSON не пиши.`,
           },
           {
             role: "user",
@@ -657,7 +654,19 @@ async function checkPromptWithOpenRouter(prompt) {
         ],
         response_format: {
           type: "json_schema",
-          json_schema: schema,
+          json_schema: {
+            name: "prompt_safety_check",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                shouldBlock: { type: "boolean" },
+                hasClearIntent: { type: "boolean" },
+              },
+              required: ["shouldBlock", "hasClearIntent"],
+              additionalProperties: false,
+            },
+          },
         },
       }),
     }
@@ -674,22 +683,18 @@ async function checkPromptWithOpenRouter(prompt) {
 
   return {
     ok: true,
-    model: data?.model || OPENROUTER_MODEL,
-    safe: Boolean(parsed?.safe),
-    shouldBlock: Boolean(parsed?.shouldBlock),
-    riskLevel: parsed?.riskLevel || "low",
-    reasons: Array.isArray(parsed?.reasons) ? parsed.reasons : [],
-    suggestedRewrite: null,
-    shortMessageRu:
-      parsed?.shortMessageRu ||
-      (parsed?.shouldBlock
-        ? "Запрос содержит 18+ контент и не может быть отправлен в генерацию."
-        : ""),
+    model: OPENROUTER_MODEL,
+    shouldBlock: Boolean(parsed.shouldBlock),
+    hasClearIntent: Boolean(parsed.hasClearIntent),
   };
 }
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/prompts", (req, res) => {
+  res.json(promptsLibrary);
 });
 
 app.get("/api/events", (req, res) => {
