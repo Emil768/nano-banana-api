@@ -1,602 +1,602 @@
 [
   {
     "id": 1,
-    "category": "Повседневный",
-    "text": "Ультрареалистичный стритстайл-портрет молодого человека, который уверенно идёт по мокрому тротуару рядом с современным кафе. На нём бежевая куртка, белая футболка, свободные оливковые джинсы и белые кроссовки. Тёплый естественный свет, золотистые блики, кинематографичное размытие, эстетика модной городской съёмки.",
-    "url": "https://pbs.twimg.com/media/G7ExsLxaQAAqOka.jpg"
+    "category": "Уличная мода",
+    "promt": "Ультрареалистичный стрит-фэшн портрет молодого человека, уверенно идущего по мокрому тротуару рядом с современным кафе. На нем бежевая куртка, белая футболка, мешковатые оливковые джинсы и белые кроссовки. Теплый естественный солнечный свет, золотистые блики, кинематографичное размытие фона, уличная мода в стиле Instagram.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693140/PROMPTS/ukmdjfocwhjdpopk7unc.jpg"
   },
   {
     "id": 2,
-    "category": "Киношный",
-    "text": "Человек стоит у края дороги на Таймс-сквер дождливой ночью и держит сложенный чёрный зонт. На нём чёрная varsity-куртка с кобальтовыми вставками и винтажной надписью. Мокрый асфальт отражает неоновые розовые и голубые огни, на фоне размытые городские такси, эстетика HD-съёмки на iPhone.",
-    "url": "https://pbs.twimg.com/media/G7DDn9lbYAA8yc0.jpg"
+    "category": "Уличная мода",
+    "promt": "Человек стоит у обочины на Таймс-сквер в дождливую ночь, держа сложенный черный зонт. На нем черная куртка из искусственной кожи с кобальтовыми вставками и винтажной надписью. Мокрый асфальт отражает неоновые пурпурные и ледяные синие огни, размытые городские такси на заднем плане, эстетика HD-фотографии на iPhone.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693141/PROMPTS/op6vx9bvaztixpsnxp1h.jpg"
   },
   {
     "id": 3,
-    "category": "Повседневный",
-    "text": "Стильная уличная fashion-фотография человека в оверсайз-худи с ярким градиентом от оранжевого к фиолетовому и зелёному. Высокие чёрные карго-брюки, классические белые кроссовки, современный городской фон и мягкий естественный свет.",
-    "url": "https://pbs.twimg.com/media/G7ACIGbagAAnGnS.jpg"
+    "category": "Уличная мода",
+    "promt": "Стильная городская фэшн-фотография человека в оверсайз-худи с ярким градиентом от оранжевого к пурпурному и зеленому. Черные брюки карго с завышенной талией и классические белые кроссовки. Сбалансированная эстетика уличной одежды, современный городской фон, мягкое естественное освещение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693142/PROMPTS/sgsnlustosyp2gdoxhep.jpg"
   },
   {
     "id": 4,
-    "category": "Киношный",
-    "text": "Ночная flash-фотография в эстетике Y2K с красной цифровой датой в углу. Человек стоит у общественного телефона и оборачивается к камере. На нём корсетный топ и свободные карго-джинсы. Жёсткая вспышка, размытые огни машин и атмосфера ранних 2000-х.",
-    "url": "https://pbs.twimg.com/media/G7E6tAeacAAI_Bg.jpg"
+    "category": "Уличная мода",
+    "promt": "Ночное фото со вспышкой в эстетике Y2K, красный цифровой штамп времени в углу. Человек стоит у уличного таксофона, оглядываясь на камеру с отстраненным взглядом. Надет топ-корсет и свободные джинсы карго. Сильный контраст от вспышки и размытые огни автомобилей на городском фоне, сырая атмосфера папарацци начала 2000-х.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693143/PROMPTS/ez5sh0dgo8w2jv2vnyvr.jpg"
   },
   {
     "id": 5,
-    "category": "Арт",
-    "text": "Тёмный кинематографичный реалистичный портрет выжившего викинга, идущего через сожжённое поселение. На нём кожаная туника с меховой отделкой, серые шерстяные штаны и боевой топор. Следы пепла и боевой раскраски, холодный утренний свет, дымящиеся кострища и заснеженные горы вдали.",
-    "url": "https://pbs.twimg.com/media/G7ABPUOaYAA5Pro.jpg"
+    "category": "Кино портреты",
+    "promt": "Темный портрет в стиле кинематографичного реализма: выживший викинг пробирается через сгоревшее поселение. Одет в кожаную тунику на меху и пепельно-серые шерстяные штаны, держит потрепанный в боях топор викинга. Размазанная боевая раскраска и пепел. Туманный утренний свет, холодные блики, тлеющие кострища и заснеженные горы вдалеке.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693144/PROMPTS/omkiisgdf49yctgqdtsu.jpg"
   },
   {
     "id": 6,
-    "category": "Арт",
-    "text": "A широкоугольный селфи taken in a well-lit cozy living room. The человек is surrounded by several famous colorful 2D cartoon and anime characters drawn in flat animation styles, crowding around enthusiastically and фотоbombing the селфи. Fun, chaotic, energetic vibe, mixed media art style, crisp real-world details.",
-    "url": "https://pbs.twimg.com/media/G7EVqaVbcAEDRMb.jpg"
+    "category": "Фантастика",
+    "promt": "Широкоугольное селфи, сделанное в хорошо освещенной уютной гостиной. Человек окружен множеством известных красочных 2D мультяшных и аниме-персонажей, нарисованных в стиле плоской анимации, которые с энтузиазмом толпятся вокруг и фотобомбят селфи. Веселая, хаотичная, энергичная атмосфера, стиль смешанной техники (mixed media), четкие детали реального мира.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693145/PROMPTS/zmesxi5plulznlfei1nz.jpg"
   },
   {
     "id": 7,
-    "category": "Арт",
-    "text": "A highly detailed macro кадр of a clear gashapon toy capsule held between human fingers. Inside the capsule is a miniature action figure of a человек в образе с стильный modern стритвир. The miniature base is decorated with neon accents. Blurred фон of an arcade room, драматичный spotlight освещение, фотоrealistic.",
-    "url": "https://pbs.twimg.com/media/G7BINw_bQAARsVf.jpg"
+    "category": "Уличная мода",
+    "promt": "Высокодетализированный макроснимок прозрачной капсулы с игрушкой гашапон, которую держат пальцы. Внутри капсулы — миниатюрная фигурка человека в стильной современной уличной одежде. База миниатюры украшена неоновыми акцентами. Размытый фон зала аркадных автоматов, драматичное точечное освещение (spotlight), фотореализм.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693146/PROMPTS/ikqxavqvr2fd3dobqvbr.jpg"
   },
   {
     "id": 8,
-    "category": "Повседневный",
-    "text": "A dazzling зеркало селфи of a стильный человек in a retail store, modern Frozen aesthetic. На нём a shimmering icy-blue corset top with sequins, white tennis skirt, and glittery gloves. Holding a rhinestone phone case. Sparkly bokeh, cool cyan backосвещение, high-fashion стритвир, разрешение 8K.",
-    "url": "https://pbs.twimg.com/media/G7AIkPwWMAAGgs4.jpg"
+    "category": "Уличная мода",
+    "promt": "Ослепительное селфи в зеркале: стильный человек в розничном магазине, современная эстетика \"Холодного сердца\" (Frozen). Надет мерцающий ледяной синий топ-корсет с блестками, белая теннисная юбка и блестящие перчатки. В руках телефон в чехле со стразами. Искрящееся боке, холодная голубая контровая подсветка, высокая уличная мода, разрешение 8k.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693146/PROMPTS/vtdznweavhjkeehu4qao.jpg"
   },
   {
     "id": 9,
-    "category": "Киношный",
-    "text": "A человек in a black hoodie sitting in a rustic wooden booth, reaching a hand forward as if performing telekinesis. Dozens of playing cards float around them in mid-air, captured in dynamic slow motion with subtle motion blur. Intense кинематографичный освещение, wooden wall фон, magic realism.",
-    "url": "https://pbs.twimg.com/media/G7DXVCqbcAA0hk3.jpg"
+    "category": "Фантастика",
+    "promt": "Человек в черном худи сидит в деревенской деревянной кабинке, протягивая руку вперед, словно применяя телекинез. Десятки игральных карт парят вокруг него в воздухе, запечатленные в динамичной замедленной съемке с легким размытием в движении (motion blur). Интенсивное кинематографичное освещение, фон деревянной стены, магический реализм.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693147/PROMPTS/mnxqq7hwzf6gilnzcico.jpg"
   },
   {
     "id": 10,
-    "category": "Повседневный",
-    "text": "Кинематографичный зеркало селфи in a bathroom lit by warm golden-hour light streaming through a small window. The человек wears a fitted charcoal tank top. Steam from a recent shower adds a hazy atmospheric layer, warm rim-light on the silhouette. Dramatic, атмосферный, film-like фотоgraphy with rich contrast.",
-    "url": "https://pbs.twimg.com/media/G7D0cM4bIAA9vpQ.jpg"
+    "category": "Кино портреты",
+    "promt": "Кинематографичное селфи в зеркале в ванной, освещенной теплым светом золотого часа, льющимся через небольшое окно. На человеке облегающая темно-серая майка. Пар от недавнего душа добавляет туманный атмосферный слой, теплый контурный свет (rim-light) на силуэте. Драматичная, атмосферная, похожая на кадр из фильма фотография с богатым контрастом.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693148/PROMPTS/f4qcbzmlp4i37zjvm6jz.jpg"
   },
   {
     "id": 11,
-    "category": "Киношный",
-    "text": "A low angle fisheye lens фото of a человек sitting on the threshold of a building entrance, legs stretched loosely in front. На нём white sneakers, a casual jacket, and small cat-eye sunglasses. Flash фотоgraphy in the dark, grunge 90s aesthetic, analog film vibe, dark gray фон.",
-    "url": "https://pbs.twimg.com/media/G6_16wiaUAAcFSa.jpg"
+    "category": "Уличная мода",
+    "promt": "Фотография с нижнего ракурса на объектив \"рыбий глаз\": человек сидит на пороге у входа в здание, небрежно вытянув ноги вперед. Надеты белые кроссовки, повседневная куртка и маленькие солнцезащитные очки \"кошачий глаз\". Фотография со вспышкой в темноте, гранж-эстетика 90-х, атмосфера аналоговой пленки, темно-серый фон.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693149/PROMPTS/a3chssjnlcppf68parll.jpg"
   },
   {
     "id": 12,
-    "category": "Киношный",
-    "text": "Vintage Kodak Portra 800 film фотоgraph. A человек leaning their upper back backwards out of an open passenger window of a moving винтажный car at ночь. Wind blowing heavily through hair, в образе с an off-shoulder white knitted top. Heavy motion blur, dreamy melancholic mood, streaking neon city lights in the фон.",
-    "url": "https://pbs.twimg.com/media/G6_4-hlW4AA31lZ.jpg"
+    "category": "Ретро стиль",
+    "promt": "Фотография на винтажную пленку Kodak Portra 800. Человек отклоняется верхней частью спины назад из открытого пассажирского окна движущегося винтажного автомобиля ночью. Сильный ветер развевает волосы, одет в белый вязаный топ с открытыми плечами. Сильное размытие в движении (motion blur), мечтательное меланхоличное настроение, полосы неоновых городских огней на заднем плане.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693150/PROMPTS/u8x5shtt8th4xsr8tnxs.jpg"
   },
   {
     "id": 13,
-    "category": "Арт",
-    "text": "Кинематографичный realism портрет of a rugged survivor trekking through a nature-reclaimed urban district. На нём a distressed plaid flannel under a worn denim jacket and heavy dirty jeans. Carrying a large olive green survival backpack. Overgrown ivy on shattered signage, мягкий diffuse daylight, эстетика The Last of Us.",
-    "url": "https://pbs.twimg.com/media/G7AbXEYbcAA1onY.jpg"
+    "category": "Кино портреты",
+    "promt": "Портрет в стиле кинематографичного реализма: суровый выживший пробирается через отвоеванный природой городской район. Одет в потертую клетчатую фланелевую рубашку под изношенной джинсовой курткой и тяжелые грязные джинсы. Несет большой оливково-зеленый рюкзак для выживания. Заросшие плющом разбитые вывески, мягкий рассеянный дневной свет, эстетика The Last of Us.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693151/PROMPTS/otbxnnghtnnynogk8mgu.jpg"
   },
   {
     "id": 14,
-    "category": "Повседневный",
-    "text": "Ультрареалистичный в полный рост кинематографичный fashion портрет. A стильный человек standing confidently against a vibrant hot-pink textured wall. На нём a brown casual overshirt, black cargo pants, and white sneakers. Яркий кинематографичный освещение, crisp highlights, bold contrast, modern fashion-фотоgraphy mood.",
-    "url": "https://pbs.twimg.com/media/G7D_uMPa8AA2ciV.jpg"
+    "category": "Уличная мода",
+    "promt": "Ультрареалистичный кинематографичный фэшн-портрет в полный рост. Стильный человек уверенно стоит на фоне яркой ярко-розовой текстурированной стены. Одет в коричневую повседневную рубашку навыпуск, черные брюки карго и белые кроссовки. Яркое кинематографичное освещение, четкие блики, смелый контраст, настроение современной модной фотографии.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693152/PROMPTS/g9hdtwzdcybg5yduqqyd.jpg"
   },
   {
     "id": 15,
-    "category": "Арт",
-    "text": "Кинематографичный arthouse film still of a человек standing in a meadow before Mount Fuji. На нём a traditional ivory furisode kimono with delicate floral embroidery. Holding an iced matcha latte. Gentle breeze, мягкий golden backlight, lo-fi analog film, lifted blacks, hazy мягкийness, visible grain, настроение в духе Вонга Карвая.",
-    "url": "https://pbs.twimg.com/media/G7A-reCbMAAcyqk.jpg"
+    "category": "Ретро стиль",
+    "promt": "Кадр из кинематографичного артхаусного фильма: человек стоит на лугу на фоне горы Фудзи. Надет традиционное кимоно фурисоде цвета слоновой кости с изящной цветочной вышивкой. Держит холодный матча латте. Легкий ветерок, мягкая золотистая контровая подсветка, лоу-фай аналоговая пленка, высветленные тени (lifted blacks), туманная мягкость, видимое зерно, настроение фильмов Вонг Карвая.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693153/PROMPTS/f4ulej0ekwdkkvqezk7c.jpg"
   },
   {
     "id": 16,
-    "category": "Киношный",
-    "text": "A high-resolution гиперреалистичный винтажный police mugкадр of a человек в образе с a tailored dark pinstripe suit. Leaning against a gritty студия wall with a height chart. Holding a винтажный mugкадр board. Desaturated sepia-toned archival фотоgraph aesthetic, confident smirk, драматичный shadows.",
-    "url": "https://pbs.twimg.com/media/G7DjU-lXQAAsXXw.jpg"
+    "category": "Ретро стиль",
+    "promt": "Гиперреалистичный винтажный полицейский магшот (снимок при аресте) в высоком разрешении: человек в сшитом на заказ темном костюме в тонкую полоску. Прислонился к шершавой стене студии с ростомером. Держит винтажную табличку для магшота. Эстетика обесцвеченной архивной фотографии в сепии, уверенная ухмылка, драматичные тени.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693154/PROMPTS/pcepmq87uozpt7gcz85w.jpg"
   },
   {
     "id": 17,
-    "category": "Киношный",
-    "text": "Sports documentary style фотоgraphy, 85mm lens. A bruised but determined boxer sitting in the corner of a boxing ring between rounds, sweating heavily, в образе с white satin boxing trunks. Dramatic overhead spotlight, deep shadows, blurred ring ropes and camera flashes in the фон, visceral кинематографичный realism.",
-    "url": "https://pbs.twimg.com/media/G7Af5xJacAAhmoA.jpg"
+    "category": "Кино портреты",
+    "promt": "Фотография в стиле спортивного документального кино, объектив 85мм. В синяках, но полный решимости боксер сидит в углу боксерского ринга между раундами, сильно потеет, одет в белые атласные боксерские шорты. Драматичный верхний свет прожектора, глубокие тени, размытые канаты ринга и вспышки камер на заднем плане, жесткий кинематографичный реализм.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693154/PROMPTS/swtzykl8v9zzejxfdn1w.jpg"
   },
   {
     "id": 18,
-    "category": "Повседневный",
-    "text": "Edgy крупный план side angle портрет of a стильный человек в образе с a black bandana with white patterns. На нём a black zip-up jacket over a graphic t-shirt and thin silver chains. Modern messy hairstyle, fair skin, intense calm expression. Яркий blue sky фон, trendy стритвир vibe.",
-    "url": "https://pbs.twimg.com/media/G7AvRRIbUAADkJG.jpg"
+    "category": "Уличная мода",
+    "promt": "Дерзкий крупный план сбоку: стильный человек в черной бандане с белыми узорами. Одет в черную куртку на молнии поверх футболки с графическим принтом и тонкие серебряные цепочки. Современная небрежная прическа, светлая кожа, напряженно-спокойное выражение лица. Фон ярко-синего неба, трендовая атмосфера уличной моды.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693155/PROMPTS/wycdkp7b84a3bwbvh4qu.jpg"
   },
   {
     "id": 19,
-    "category": "Ретро",
-    "text": "Direct-flash snapкадр of a человек sitting cross-legged on a ретро couch, holding a винтажный game controller. На нём a white cotton camisole and shorts. Dimly lit 90s gamer room packed with shelves of action figures and винтажный consoles. Тёплый tungsten glow, высокий контраст плёночное зерно, nostalgic intimate vibe.",
-    "url": "https://pbs.twimg.com/media/G7BoKeoXcAAq0zA.jpg"
+    "category": "Ретро стиль",
+    "promt": "Снимок с прямой вспышкой: человек сидит скрестив ноги на ретро-диване, держа в руках винтажный игровой контроллер. Одет в белую хлопковую майку и шорты. Тускло освещенная комната геймера из 90-х, заставленная полками с экшен-фигурками и старыми консолями. Теплое свечение ламп накаливания, высококонтрастное зерно пленки, ностальгическая интимная атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693156/PROMPTS/xrlialdol1gebzjir5tu.jpg"
   },
   {
     "id": 20,
-    "category": "Арт",
-    "text": "A stunning avant-garde fashion портрет. The человек wears an elaborate dress inspired by a chessboard and playing cards glossy metallic teal and silver checkered pattern, baroque gold filigree armor plating. Elaborate hair accessory made of playing cards and gold chains. Posing with a jeweled ram skull. Кинематографичный освещение, рендер в стиле Octane.",
-    "url": "https://pbs.twimg.com/media/G6_omw9asAAyw-V.jpg"
+    "category": "Уличная мода",
+    "promt": "Потрясающий авангардный фэшн-портрет. На человеке сложное платье, вдохновленное шахматной доской и игральными картами: глянцевый металлический бирюзово-серебряный клетчатый узор, барочная золотая филигранная броня. Сложный аксессуар для волос из игральных карт и золотых цепей. Позирует с украшенным драгоценностями черепом барана. Кинематографичное освещение, Octane render.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693157/PROMPTS/b4vq2nqdig5gjfrnwogh.jpg"
   },
   {
     "id": 21,
-    "category": "Повседневный",
-    "text": "A 4-grid фото layout showing four different candid street style фотоgraphs of the same человек. Natural daylight. Top-left walking mid-stride and laughing. Top-right sitting on a bench thoughtfully. Bottom-left standing and waving. Bottom-right крупный план surprised expression. Urban blurred фон.",
-    "url": "https://pbs.twimg.com/media/G7BW_lqa8AASl8u.jpg"
+    "category": "Уличная мода",
+    "promt": "Коллаж из 4 фотографий (сетка 2х2), показывающий четыре разных откровенных стрит-стайл снимка одного и того же человека. Естественный дневной свет. Сверху слева: смеется на ходу. Сверху справа: задумчиво сидит на скамейке. Снизу слева: стоит и машет рукой. Снизу справа: крупный план, удивленное выражение лица. Размытый городской фон.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693158/PROMPTS/uivam8m68mmvn3yvg7df.jpg"
   },
   {
     "id": 22,
-    "category": "Арт",
-    "text": "A cozy Christmas market портрет overwhelmed by 2D neon maximalist festive monsters. The человек sits on a wooden market bench among twinkle lights. Flat neon pop-art gingerbread goblins and snowball creatures with thick black outlines float around the фотоrealistic subject. Surreal holiday aesthetic.",
-    "url": "https://pbs.twimg.com/media/G7CNj8hbMAAN94g.jpg"
+    "category": "Фантастика",
+    "promt": "Уютный портрет на рождественской ярмарке, переполненный 2D неоновыми максималистичными праздничными монстрами. Человек сидит на деревянной рыночной скамейке среди мерцающих огней. Плоские неоновые поп-арт пряничные гоблины и снежные создания с толстыми черными контурами парят вокруг фотореалистичного объекта. Сюрреалистичная праздничная эстетика.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693159/PROMPTS/w2thve2quikv2h00c0ut.jpg"
   },
   {
     "id": 23,
-    "category": "Арт",
-    "text": "A гиперреалистичный портрет torn down the middle with a white ripped-paper edge. The left side is a realistic винтажный analog фото with мягкий grain. The right side is a vibrant digital cartoon illustration of the same человек on a bright pink pop-art фон with kawaii stickers and yellow stars.",
-    "url": "https://pbs.twimg.com/media/G7C-6cKbEAAgOXS.jpg"
+    "category": "Фантастика",
+    "promt": "Гиперреалистичный портрет, разорванный посередине с белым краем рваной бумаги. Левая сторона — реалистичное винтажное аналоговое фото с мягким зерном. Правая сторона — яркая цифровая мультяшная иллюстрация того же человека на ярко-розовом поп-арт фоне с кавайными стикерами и желтыми звездами.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693161/PROMPTS/blf68lsl77r08cfvpsgd.jpg"
   },
   {
     "id": 24,
-    "category": "Повседневный",
-    "text": "Photorealistic medium портрет of a человек at a Disney theme park during Christmas ночь. На нём fluffy earmuffs, a green jacket with Mickey Mouse embroidery, and high-waisted jeans. Holding a plush Minnie Mouse doll in a Santa outfit. Twinkling warm lights, classic green lamppost, glowing carousel in blurred фон.",
-    "url": "https://pbs.twimg.com/media/G7AdeWiW8AAw9FT.jpg"
+    "category": "Уличная мода",
+    "promt": "Фотореалистичный поясной портрет человека в тематическом парке Disney в рождественскую ночь. Надеты пушистые наушники, зеленая куртка с вышивкой Микки Мауса и джинсы с высокой талией. Держит плюшевую куклу Минни Маус в костюме Санты. Мерцающие теплые огни, классический зеленый фонарный столб, светящаяся карусель на размытом фоне.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693162/PROMPTS/pmltge0gmexxlruzpgdv.jpg"
   },
   {
     "id": 25,
-    "category": "Киношный",
-    "text": "Dramatic атмосферный портрет of a человек standing in a completely black фон. A narrow beam spotlight is focused only on the face, creating a high falloff shadow. На нём a black knit sweater that blends into the darkness. One hand raised gently to the lips, mysterious atmosphere, sharp edges of light.",
-    "url": "https://pbs.twimg.com/media/G7Ah9RbbQAAbaQq.jpg"
+    "category": "Кино портреты",
+    "promt": "Драматичный атмосферный портрет человека, стоящего на полностью черном фоне. Узкий луч прожектора сфокусирован только на лице, создавая тень с резким спадом. Надет черный вязаный свитер, который сливается с темнотой. Одна рука нежно поднесена к губам, загадочная атмосфера, резкие границы света.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693164/PROMPTS/omiic71dpwaaumxv8xgj.jpg"
   },
   {
     "id": 26,
-    "category": "Повседневный",
-    "text": "Casual уличный lifestyle портрет of a человек sitting relaxed inside a cable car cabin. На нём a light grey fitted crop top and loose sweatpants. Background of lush green trees, forested hills, and cable lines in the sky. Мягкий естественный дневной свет, warm golden-hour tones, разрешение 8K.",
-    "url": "https://pbs.twimg.com/media/G6-hwOxbAAAPDsP.jpg"
+    "category": "Кино портреты",
+    "promt": "Повседневный лайфстайл-портрет: человек расслабленно сидит внутри кабины канатной дороги. Надет светло-серый облегающий кроп-топ и свободные спортивные штаны. На фоне густые зеленые деревья, лесистые холмы и тросы на фоне неба. Мягкий естественный дневной свет, теплые тона золотого часа, разрешение 8k.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693165/PROMPTS/pa06ya2uyxqawj1tfy77.jpg"
   },
   {
     "id": 27,
-    "category": "Повседневный",
-    "text": "A крупный план movie-style портрет. A человек in an art cafe holding a large bouquet of white flowers. На нём a Korean fashion outfit white top with puff sleeves and black pleated skirt. Тёмный and dim cafe фон with round light balls, distinct плёночное зерно, Fuji Pro 400H filter.",
-    "url": "https://pbs.twimg.com/media/G67dP0obkAEAOFz.jpg"
+    "category": "Кино портреты",
+    "promt": "Крупный план в кинематографичном стиле. Человек в арт-кафе держит большой букет белых цветов. Одет в корейском модном стиле: белый топ с объемными рукавами и черная плиссированная юбка. Темный и тусклый фон кафе с круглыми световыми шарами, отчетливое зерно пленки, фильтр Fuji Pro 400H.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693166/PROMPTS/yl0ruoomjxu35uec6ehr.jpg"
   },
   {
     "id": 28,
-    "category": "Арт",
-    "text": "A человек deeply concentrated, assembling a mechanical device in a cluttered home workshop. A glowing 3D exploded view assembly hologram floats in the air above the workbench with yellow vector lines and part IDs. Cool fluorescent light mixed with warm holographic glow, shallow depth of field.",
-    "url": "https://pbs.twimg.com/media/G68IcCpWgAAwo6-.jpg"
+    "category": "Фантастика",
+    "promt": "Глубоко сосредоточенный человек собирает механическое устройство в захламленной домашней мастерской. Светящаяся 3D-голограмма сборки в разобранном виде парит в воздухе над верстаком с желтыми векторными линиями и идентификаторами деталей. Холодный флуоресцентный свет смешивается с теплым голографическим свечением, малая глубина резкости.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693167/PROMPTS/cjxu1gpxmnhalsf5uhet.jpg"
   },
   {
     "id": 29,
-    "category": "Повседневный",
-    "text": "A chic селфи from the waist up. A человек in the driver's seat of a Tesla with white luxury interior. На нём an ivory fitted top and an oversized denim jacket. Gloomy morning sunlight across the face, natural glow, sensual and cool aura, slight motion blur фон.",
-    "url": "https://pbs.twimg.com/media/G6-uFPybIAETntG.jpg"
+    "category": "Уличная мода",
+    "promt": "Шикарное селфи по пояс. Человек на водительском сиденье Tesla с белым роскошным интерьером. Надет облегающий топ цвета слоновой кости и оверсайз джинсовая куртка. Мрачный утренний солнечный свет падает на лицо, естественное свечение, чувственная и крутая аура, легкое размытие в движении на фоне.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693168/PROMPTS/glfdxfndijsgqy2wdvtj.jpg"
   },
   {
     "id": 30,
-    "category": "Ретро",
-    "text": "Y2K Digital Aesthetic портрет. A человек with a Kuromi hair clip в образе с a dark grey spaghetti strap top and silver chain belt. Captured with a strong front flash from a digital camera, making skin look radiant and bright with высокий контраст. Early 2000s Japanese-Korean ретро look, cool blue tones.",
-    "url": "https://pbs.twimg.com/media/G67WOTybkAcLuHd.jpg"
+    "category": "Уличная мода",
+    "promt": "Портрет в цифровой эстетике Y2K. Человек с заколкой Kuromi одет в темно-серый топ на тонких бретельках и пояс из серебряной цепочки. Снято с сильной фронтальной вспышкой от цифровой камеры, что делает кожу сияющей и яркой с высоким контрастом. Японско-корейский ретро-образ начала 2000-х, холодные синие тона.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693169/PROMPTS/dco13mmdyxo3sdxtz6r7.jpg"
   },
   {
     "id": 31,
-    "category": "Повседневный",
-    "text": "Extreme fisheye lens крупный план on a sunny boardwalk. A человек leaning forward, sipping an iced matcha latte through a straw. На нём a bright green knit sweater and chunky blue sunglasses. Strong distortion, funny and intimate mood, colorful stalls and clear blue sky in the фон.",
-    "url": "https://pbs.twimg.com/media/G6_pAefWYAAilqz.jpg"
+    "category": "Уличная мода",
+    "promt": "Экстремальный крупный план на объектив \"рыбий глаз\" на солнечной набережной. Человек наклоняется вперед, потягивая ледяной матча латте через трубочку. Надет ярко-зеленый вязаный свитер и массивные синие солнцезащитные очки. Сильное искажение, забавная и интимная атмосфера, красочные киоски и чистое голубое небо на заднем плане.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693171/PROMPTS/bi7fmkcjrgit8hjxtjcl.jpg"
   },
   {
     "id": 32,
-    "category": "Арт",
-    "text": "A macro фото of a toy figure of a человек, split vertically in half. The left half is a normal glossy plastic figure; the right half is a transparent shell showing internal mechanical gears, electronics, and microchips. Dramatic кинематографичный освещение, white technical annotations in the air.",
-    "url": "https://pbs.twimg.com/media/G68WY29WQAAr7ps.jpg"
+    "category": "Фантастика",
+    "promt": "Макрофотография игрушечной фигурки человека, разделенной по вертикали пополам. Левая половина — обычная глянцевая пластиковая фигурка; правая половина — прозрачная оболочка, сквозь которую видны внутренние механические шестеренки, электроника и микрочипы. Драматичное кинематографичное освещение, белые технические аннотации в воздухе.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693171/PROMPTS/xg29bhcsfkwmwd5asxap.jpg"
   },
   {
     "id": 33,
-    "category": "Ретро",
-    "text": "Pinterest-inspired editorial fashion shoot. A стильный человек standing against a plain wall in a black striped waistcoat and trousers. Voluminous wavy hair, драматичный deep shadows across the wall. Gдождливый ретро film effect, высокий контраст освещение, атмосферный and glamorous 90s atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6-JVLgbkAIYoFm.jpg"
+    "category": "Уличная мода",
+    "promt": "Фэшн-съемка в стиле Pinterest. Стильный человек стоит на фоне простой стены в черном полосатом жилете и брюках. Объемные волнистые волосы, драматичные глубокие тени на стене. Зернистый эффект ретро-пленки, высококонтрастное освещение, атмосферное и гламурное настроение 90-х.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693173/PROMPTS/rsse7i2unz5wjkqz9nb1.jpg"
   },
   {
     "id": 34,
-    "category": "Киношный",
-    "text": "Гиперреалистичный 8k портрет against a deep red фон. A человек with sharp features в образе с a black suit jacket and red striped tie with the collar slightly open. Dramatic red and black освещение highlights the jawline and neck, creating a powerful, атмосферный, and кинематографичный atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6_-BbWaIAAQ1UU.jpg"
+    "category": "Кино портреты",
+    "promt": "Гиперреалистичный портрет 8k на глубоком красном фоне. Человек с резкими чертами лица, одет в черный пиджак и красный полосатый галстук со слегка расстегнутым воротником. Драматичное красно-черное освещение подчеркивает линию челюсти и шею, создавая мощную, мрачную и кинематографичную атмосферу.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693174/PROMPTS/fgmi9ta5yxw8zclqvsfr.jpg"
   },
   {
     "id": 35,
-    "category": "Ретро",
-    "text": "Analog 1980s point-and-shoot camera фото. A человек in a mustard-yellow blouse with balloon sleeves sitting in a floral rattan chair. Background shows an old CRT television, family фотоs, and ретро tiles. Faded analog tones, internal flash highlights, slight overexposure, handwritten date 'Nov 1988'.",
-    "url": "https://pbs.twimg.com/media/G6-n7F9bkAAVxrn.jpg"
+    "category": "Ретро стиль",
+    "promt": "Аналоговое фото на мыльницу из 1980-х. Человек в горчично-желтой блузке с рукавами-фонариками сидит в цветочном ротанговом кресле. На заднем плане старый телевизор с ЭЛТ, семейные фотографии и ретро-плитка. Выцветшие аналоговые тона, блики от встроенной вспышки, небольшая передержка, написанная от руки дата \"Nov 1988\".",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693175/PROMPTS/b2m53qklrgwp1dhfhb1b.jpg"
   },
   {
     "id": 36,
-    "category": "Киношный",
-    "text": "High-contrast Noir fashion фотоgraphy. A sophisticated человек in a black bodysuit stands against a massive floor-to-ceiling window in a luxury penthouse. Rainy city skyline at ночь in the фон. Dramatic rim освещение, deep velvet shadows, Ilford Delta 3200 black and white film style.",
-    "url": "https://pbs.twimg.com/media/G6866m9bkAEJJbQ.jpg"
+    "category": "Уличная мода",
+    "promt": "Высококонтрастная нуарная фэшн-фотография. Утонченный человек в черном боди стоит на фоне огромного окна от пола до потолка в роскошном пентхаусе. Дождливый горизонт ночного города на заднем плане. Драматичный контурный свет (rim lighting), глубокие бархатные тени, стиль черно-белой пленки Ilford Delta 3200.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693176/PROMPTS/ra2nkfsjln7c55lltbbs.jpg"
   },
   {
     "id": 37,
-    "category": "Арт",
-    "text": "A behind-the-scenes view of a кинематографичный movie set. The actors are in position, but the frame reveals professional освещение rigs, cameras on dollies, and the film crew in the shadows. Denoise and crisp image, atmospheric motion, a mix of raw technical equipment and movie magic.",
-    "url": "https://pbs.twimg.com/media/G67ZPJ2WYAAEhpt.jpg"
+    "category": "Кино портреты",
+    "promt": "Закулисный взгляд на кинематографичную съемочную площадку. Актеры на позициях, но в кадре видны профессиональные осветительные установки, камеры на тележках и съемочная группа в тени. Чистое от шумов изображение (denoise), атмосферное движение, смесь сырого технического оборудования и магии кино.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693176/PROMPTS/gcjuqf7qqunjirko7hnl.jpg"
   },
   {
     "id": 38,
-    "category": "Арт",
-    "text": "A кинематографичный scene of a человек sitting confidently on a table in a luxury home office. The фон features a huge artistic painted портрет of the same человек with expressive pastel brushstrokes. Мягкий daylight, fashion-editorial mood, clean composition, blending reality and art.",
-    "url": "https://pbs.twimg.com/media/G6-Hz_kbkAMGJvn.jpg"
+    "category": "Уличная мода",
+    "promt": "Кинематографичная сцена: человек уверенно сидит на столе в роскошном домашнем офисе. На заднем плане — огромный художественный живописный портрет этого же человека с выразительными пастельными мазками. Мягкий дневной свет, настроение фэшн-эдиториал, чистая композиция, смешивающая реальность и искусство.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693177/PROMPTS/ejx4fsqfabm8glensmkf.jpg"
   },
   {
     "id": 39,
-    "category": "Повседневный",
-    "text": "Casual lifestyle smartphone фото. A человек standing in a modern kitchen with white cabinets, holding a mixing bowl and whisk, mid-stir. На нём a navy blue knit shirt and denim jeans. Яркий cheerful smile, warm мягкий в помещении освещение, natural shadows, authentic home-cooking moment.",
-    "url": "https://pbs.twimg.com/media/G67Hi6_bMAAElKv.jpg"
+    "category": "Уличная мода",
+    "promt": "Повседневное лайфстайл-фото на смартфон. Человек стоит в современной кухне с белыми шкафчиками, держит миску для смешивания и венчик, в процессе готовки. Одет в темно-синюю вязаную рубашку и джинсы. Яркая жизнерадостная улыбка, теплое мягкое освещение в помещении, естественные тени, аутентичный момент домашней кулинарии.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693178/PROMPTS/dcs8xdrihj7o93neykes.jpg"
   },
   {
     "id": 40,
-    "category": "Арт",
-    "text": "A mysterious человек standing alone in a vast golden desert at sunset. Dressed in flowing dark robes with subtle embroidery, headscarf trailing драматичныйally in the wind. Мягкий warm light on the dunes, long shadows, ancient and serene atmosphere. Гиперреалистичный кинематографичный портрет.",
-    "url": "https://pbs.twimg.com/media/G60O_26aIAAhH1o.jpg"
+    "category": "Кино портреты",
+    "promt": "Таинственный человек стоит в одиночестве в бескрайней золотой пустыне на закате. Одет в струящиеся темные мантии с тонкой вышивкой, платок драматично развевается на ветру. Мягкий теплый свет на дюнах, длинные тени, древняя и безмятежная атмосфера. Гиперреалистичный кинематографичный портрет.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693180/PROMPTS/yt7zdonjh8ilx3cefq9x.jpg"
   },
   {
     "id": 41,
-    "category": "Ретро",
-    "text": "Мягкий-lit dark 90s портрет, Dutch angle. A человек in an oversized flannel standing under dense trees, lifting a винтажный camera toward a break in the canopy. Muted warm highlights against deep cool greens, heavy плёночное зерно, quiet and атмосферный forest atmosphere, разрешение 4K.",
-    "url": "https://pbs.twimg.com/media/G61nkECbQAEXcTx.jpg"
+    "category": "Ретро стиль",
+    "promt": "Темный портрет с мягким освещением в стиле 90-х, голландский угол (Dutch angle). Человек в оверсайз-фланелевой рубашке стоит под густыми деревьями, поднимая винтажную камеру к просвету в кронах. Приглушенные теплые блики на фоне глубоких холодных зеленых тонов, сильное зерно пленки, тихая и атмосферная лесная обстановка, разрешение 4k.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693181/PROMPTS/jeppr6jewdza4qphff2l.jpg"
   },
   {
     "id": 42,
-    "category": "Киношный",
-    "text": "Ультрареалистичный кинематографичный фото. A человек in a dark bespoke suit standing next to a matte black wide-bodied muscle car. Dystopian city ночь street, fiery circular industrial light tunnel in the фон. Dramatic chiaroscuro освещение, strong amber highlights, deep shadows.",
-    "url": "https://pbs.twimg.com/media/G60w1zra0AIJEKy.jpg"
+    "category": "Уличная мода",
+    "promt": "Ультрареалистичное кинематографичное фото. Человек в темном сшитом на заказ костюме стоит рядом с матово-черным широкофюзеляжным маслкаром. Антиутопичная ночная городская улица, огненный круглый индустриальный световой туннель на заднем плане. Драматичное освещение кьяроскуро (светотень), сильные янтарные блики, глубокие тени.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693181/PROMPTS/cggqwpgzl7fo4iaux1g5.jpg"
   },
   {
     "id": 43,
-    "category": "Киношный",
-    "text": "Rugged крупный план портрет of a человек with a textured beard and messy hair. На нём dark sunglasses with green-tinted lenses reflecting subtle light. Dramatic low-key освещение highосвещение skin textures and facial contours. Serious brooding expression, shadowy фон, gritty детализация 8K.",
-    "url": "https://pbs.twimg.com/media/G61GbWKasAAePoZ.jpg"
+    "category": "Кино портреты",
+    "promt": "Суровый крупный план: человек с текстурированной бородой и растрепанными волосами. Одет в темные солнцезащитные очки с зелеными линзами, отражающими легкий свет. Драматичное освещение в низком ключе (low-key lighting), подчеркивающее текстуру кожи и контуры лица. Серьезное задумчивое выражение, теневой фон, суровая детализация 8k.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693182/PROMPTS/i2rwtveipatwchemlmgq.jpg"
   },
   {
     "id": 44,
-    "category": "Ретро",
-    "text": "Vintage кинематографичный крупный план. A человек with a messy bob haircut в образе с an ivory macramé camisole. Background is a wall with Japanese Maneki-neko art and red maple leaves. Harsh драматичный shadows, rich but faded color saturation, 90s Hong Kong cinema aesthetic.",
-    "url": "https://pbs.twimg.com/media/G62OduMaoAABOG2.jpg"
+    "category": "Ретро стиль",
+    "promt": "Винтажный кинематографичный крупный план. Человек с небрежной стрижкой боб, одет в топ-камисоль цвета слоновой кости в технике макраме. На фоне стена с японским искусством Манэки-нэко и красными кленовыми листьями. Резкие драматичные тени, богатая, но блеклая насыщенность цветов, эстетика гонконгского кино 90-х.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693183/PROMPTS/v1hll1w6meoj9j7kfb4i.jpg"
   },
   {
     "id": 45,
-    "category": "Ретро",
-    "text": "A Y2K-inspired digital poster collage. Яркий turquoise and neon pink color palette. Multiple instances of the same человек a large крупный план on the left and a в полный рост кадр on the right in a low-rise mini skirt. Graphic overlays, silver belt buckles, and vibrant фото manipulation.",
-    "url": "https://pbs.twimg.com/media/G60ucuCWcAAHkm5.jpg"
+    "category": "Ретро стиль",
+    "promt": "Цифровой постер-коллаж в стиле Y2K. Яркая бирюзовая и неоново-розовая цветовая палитра. Множественные изображения одного и того же человека: крупный план слева и снимок в полный рост справа в мини-юбке с заниженной талией. Графические наложения, серебряные пряжки ремней и яркая фотоманипуляция.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693185/PROMPTS/nv0fzvyhuebp4bks83ht.jpg"
   },
   {
     "id": 46,
-    "category": "Арт",
-    "text": "A romantic scene of a человек sitting gracefully on a moonlit beach. На нём a flowing green off-the-shoulder gown. Brass lanterns with glowing candles and scattered roses on the sand. Large luminous full moon hovering above the sea horizon, starry ночь sky, кинематографичный освещение.",
-    "url": "https://pbs.twimg.com/media/G62QG8IXcAEL62G.jpg"
+    "category": "Кино портреты",
+    "promt": "Романтическая сцена: человек грациозно сидит на залитом лунным светом пляже. Надето струящееся зеленое платье с открытыми плечами. Латунные фонари со светящимися свечами и разбросанные розы на песке. Огромная светящаяся полная луна парит над морским горизонтом, звездное ночное небо, кинематографичное освещение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693185/PROMPTS/ka2fegtrsehxg9uv3a4x.jpg"
   },
   {
     "id": 47,
-    "category": "Киношный",
-    "text": "Кинематографичный ночь-drive портрет. A человек leaning slightly out of a moving car window, head turned back with a playful expression. Wind in the hair, streetlights stretching into glowing trails. Dreamy navy and pink color palette, мягкий плёночное зерно, intimate and атмосферный atmosphere.",
-    "url": "https://pbs.twimg.com/media/G62vcmaXQAASZli.jpg"
+    "category": "Уличная мода",
+    "promt": "Кинематографичный портрет во время ночной поездки. Человек слегка высовывается из окна движущегося автомобиля, повернув голову назад с игривым выражением лица. Ветер в волосах, уличные фонари растягиваются в светящиеся следы (световые шлейфы). Мечтательная темно-синяя и розовая цветовая палитра, мягкое зерно пленки, интимная и атмосферная обстановка.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693187/PROMPTS/dl47xj2p17qvmuq4ntkw.jpg"
   },
   {
     "id": 48,
-    "category": "Киношный",
-    "text": "A 4-panel fashion lifestyle collage. 2x2 grid showing a человек in a black satin slip dress and leather jacket. Panel 1 Flash кадр against a metal door. Panel 2 Walking toward city lights. Panel 3 Sitting at a rooftop bar with a drink. Panel 4 Face illuminated by a neon sign.",
-    "url": "https://pbs.twimg.com/media/G6y3eeCWcAAXuor.jpg"
+    "category": "Уличная мода",
+    "promt": "Фэшн-лайфстайл коллаж из 4 панелей (сетка 2x2): человек в черном атласном платье-комбинации и кожаной куртке. Панель 1: снимок со вспышкой на фоне металлической двери. Панель 2: идет навстречу городским огням. Панель 3: сидит в баре на крыше с напитком. Панель 4: лицо освещено неоновой вывеской.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693187/PROMPTS/j6tjnvjkk5r24g0mm8lx.jpg"
   },
   {
     "id": 49,
-    "category": "Киношный",
-    "text": "RAW-фотография в стиле iPhone 16 Pro Max. A человек seated at a ночь market table with a red checkered tablecloth. Vivid royal blue satin top, gold hoop earrings. Sizzling bone marrow and street food on the table. Direct flash освещение, высокий контраст, warm ambient string lights in the bokeh фон.",
-    "url": "https://pbs.twimg.com/media/G6znX7maIAAwpdU.jpg"
+    "category": "Уличная мода",
+    "promt": "RAW-фотография на iPhone 16 Pro Max. Человек сидит за столиком на ночном рынке с красной клетчатой скатертью. Ярко-синий королевский атласный топ, золотые серьги-кольца. Шипящий костный мозг и уличная еда на столе. Прямое освещение вспышкой, высокий контраст, теплые гирлянды ламп в боке на заднем плане.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693189/PROMPTS/wo4ktw1uzaomkgz9wdel.jpg"
   },
   {
     "id": 50,
-    "category": "Ретро",
-    "text": "A legendary кинематографичный кадр. A человек styled as Marilyn Monroe standing in the middle of modern-day Times Square, holding a modern iPhone. The iconic white dress blowing upwards, bright neon billboards in the фон, a mix of 1950s glamour and 2025 technology.",
-    "url": "https://pbs.twimg.com/media/G62xDVoWMAAHvCB.jpg"
+    "category": "Уличная мода",
+    "promt": "Легендарный кинематографичный кадр. Человек в стиле Мэрилин Монро стоит посреди современного Таймс-сквер, держа в руках современный iPhone. Культовое белое платье раздувается вверх, яркие неоновые билборды на заднем плане, смесь гламура 1950-х и технологий 2025 года.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693190/PROMPTS/qffbq1ytvzahhtixkjzz.jpg"
   },
   {
     "id": 51,
-    "category": "Ретро",
-    "text": "Elite fashion magazine aesthetic. A человек interacting naturally with a majestic horse in a снежный winter landscape. Luxurious wool coat and scarf, silvery diffused shine, мягкий cream and ice-blue tones. Increased contrast, molecular detail on fabric, high-fashion editorial quality.",
-    "url": "https://pbs.twimg.com/media/G60dM7xXsAAw3xH.jpg"
+    "category": "Уличная мода",
+    "promt": "Эстетика элитного модного журнала. Человек естественно взаимодействует с величественной лошадью на фоне заснеженного зимнего пейзажа. Роскошное шерстяное пальто и шарф, серебристый рассеянный блеск, мягкие кремовые и ледяные голубые тона. Повышенный контраст, молекулярная детализация ткани, качество high-fashion эдиториал.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693190/PROMPTS/d3ncwx4v4lrqwamb52wa.jpg"
   },
   {
     "id": 52,
-    "category": "Повседневный",
-    "text": "Natural крупный план портрет. A человек lying on a мягкий bed, head resting on one hand, looking relaxed and calm. Мягкий natural sunlight filtering through a window with gentle shadows. Long messy hair framing the face, cozy в помещении scene, мягкий bokeh фон, warm and peaceful mood.",
-    "url": "https://pbs.twimg.com/media/G61UM9baQAAbtmT.jpg"
+    "category": "Кино портреты",
+    "promt": "Естественный крупный план. Человек лежит на мягкой кровати, подперев голову рукой, выглядит расслабленным и спокойным. Мягкий естественный солнечный свет струится через окно с легкими тенями. Длинные растрепанные волосы обрамляют лицо, уютная домашняя сцена, мягкий фон боке, теплое и умиротворенное настроение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693191/PROMPTS/yqyyxxflp9xguoq0fobm.jpg"
   },
   {
     "id": 53,
-    "category": "Киношный",
-    "text": "Ночь Drag Shutter technique. A visual explosion in the middle of a fast-moving city street. A человек's face is frozen sharp while the world around is a blur of sweeping light movements and long exposures. Raw, wild, 'noir' atmosphere, neon streaks, high-energy urban ночь.",
-    "url": "https://pbs.twimg.com/media/G62e8KIaEAAaQ8h.jpg"
+    "category": "Уличная мода",
+    "promt": "Техника длинной выдержки со вспышкой ночью (Night Drag Shutter). Визуальный взрыв посреди быстро движущейся городской улицы. Лицо человека застыло в резкости, в то время как мир вокруг представляет собой размытие от стремительных световых движений. Сырая, дикая \"нуарная\" атмосфера, неоновые полосы, высокоэнергичная городская ночь.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693193/PROMPTS/mgdu66dgt5tr0tgohevs.jpg"
   },
   {
     "id": 54,
-    "category": "Арт",
-    "text": "Modern fashion фотоgraphy. A стильный человек in a pink knitted sweater and jeans, resting their arm casually on a giant 3D-rendered фотоrealistic Angry Birds 'Pink' character. Solid vibrant pink студия backdrop, clean glossy textures, playful and bright aesthetic.",
-    "url": "https://pbs.twimg.com/media/G6zf2Ila4AAPFBs.jpg"
+    "category": "Фантастика",
+    "promt": "Современная модная фотография. Стильный человек в розовом вязаном свитере и джинсах небрежно опирается рукой на гигантского 3D-отрендеренного фотореалистичного персонажа Стеллу (Pink) из Angry Birds. Сплошной яркий розовый студийный фон, чистые глянцевые текстуры, игривая и яркая эстетика.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693195/PROMPTS/igahilk5nt8rob64znkt.jpg"
   },
   {
     "id": 55,
-    "category": "Ретро",
-    "text": "A wholesome winter moment. A человек in a black hoodie puckering lips toward a small white puppy with light blue eyes. Snow covering the ground, bare trees and a blurred car in the фон. Мягкий depth of field, естественный дневной свет, cute and cozy уличный atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6wtclHXoAA_tyR.jpg"
+    "category": "Уличная мода",
+    "promt": "Трогательный зимний момент. Человек в черном худи вытягивает губы к маленькому белому щенку со светло-голубыми глазами. Снег покрывает землю, голые деревья и размытая машина на заднем плане. Мягкая глубина резкости, естественный дневной свет, милая и уютная атмосфера на открытом воздухе.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693196/PROMPTS/f3zkeggzaahbof3qvwgl.jpg"
   },
   {
     "id": 56,
-    "category": "Ретро",
-    "text": "Top-down perspective. A человек lying on a white floor in a classic 90s outfit with ретро headphones and a cassette player. Scattered around are colorful vinyl records, chunky old CRT televisions, and винтажный electronics. Clean spacing, nostalgic 90s aesthetic, vibrant ретро colors.",
-    "url": "https://pbs.twimg.com/media/G6xBC2Ma0AIYZ34.jpg"
+    "category": "Ретро стиль",
+    "promt": "Вид сверху (Top-down). Человек лежит на белом полу в классическом наряде 90-х с ретро-наушниками и кассетным плеером. Вокруг разбросаны разноцветные виниловые пластинки, массивные старые телевизоры с ЭЛТ и винтажная электроника. Чистое распределение пространства (knolling), ностальгическая эстетика 90-х, яркие ретро-цвета.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693197/PROMPTS/akz92w82mjh31kmibcxm.jpg"
   },
   {
     "id": 57,
-    "category": "Киношный",
-    "text": "Retro analog film фотоgraphy. A человек seated confidently in the driver's seat of a винтажный red luxury car with red leather interior. На нём a deep red velvet winter outfit with fur trim and a fur hat. Snowy urban фон through the windows, muted tones, мягкий vignette, elegant mood.",
-    "url": "https://pbs.twimg.com/media/G6wQ-5faQAAwELC.jpg"
+    "category": "Ретро стиль",
+    "promt": "Ретро аналоговая пленочная фотография. Человек уверенно сидит на водительском сиденье винтажного красного роскошного автомобиля с красным кожаным салоном. Одет в темно-красный бархатный зимний наряд с меховой отделкой и меховую шапку. Заснеженный городской фон за окнами, приглушенные тона, мягкое виньетирование, элегантное настроение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693198/PROMPTS/hs5nv8ektayzegximypp.jpg"
   },
   {
     "id": 58,
-    "category": "Арт",
-    "text": "Surreal macro фотоgraphy. A tiny street musician, no taller than a wine bottle, performing on a violin atop a stack of винтажный books in a Parisian bookshop. На нём a patchwork velvet coat and a thimble-sized hat. Golden afternoon light, dust motes, honey-colored atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6w1o2OacAAv7Xa.jpg"
+    "category": "Фантастика",
+    "promt": "Сюрреалистичная макрофотография. Крошечный уличный музыкант ростом не выше винной бутылки играет на скрипке на стопке старинных книг в парижском книжном магазине. Одет в лоскутное бархатное пальто и шляпу размером с наперсток. Золотистый послеобеденный свет, пылинки в воздухе, медовая атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693199/PROMPTS/jxdcbuqtm2zscgwcdkx9.jpg"
   },
   {
     "id": 59,
-    "category": "Ретро",
-    "text": "Disposable camera picture with harsh flash. A messy living room after a chaotic party. A человек sitting on a couch among iconic characters (like Breaking Bad style). Cluttered coffee table with bottles, chips, and pizza boxes. Silly, nostalgic, and humorous snapкадр with a 90s timestamp.",
-    "url": "https://pbs.twimg.com/media/G6wGqTDXoAA9qAO.jpg"
+    "category": "Ретро стиль",
+    "promt": "Снимок на одноразовую камеру с резкой вспышкой. Грязная гостиная после хаотичной вечеринки. Человек сидит на диване среди культовых персонажей (в стиле \"Во все тяжкие\"). Захламленный журнальный столик с бутылками, чипсами и коробками от пиццы. Дурашливый, ностальгический и юмористический снимок с штампом времени из 90-х.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693200/PROMPTS/gc0ag4asaquwhpt123ju.jpg"
   },
   {
     "id": 60,
-    "category": "Ретро",
-    "text": "Editorial painterly style. A человек in a rust-orange satin dress reclining on their side in a винтажный interior. An orange British Shorthair cat is lying comfortably in front. Aged books, dried eucalyptus in a vase, warm студия освещение, rich textures, 8k кинематографичный quality.",
-    "url": "https://pbs.twimg.com/media/G6uiqA7WAAAzmKH.jpg"
+    "category": "Ретро стиль",
+    "promt": "Журнальный живописный стиль. Человек в ржаво-оранжевом атласном платье лежит на боку в винтажном интерьере. Рыжий британский короткошерстный кот уютно лежит спереди. Старые книги, сушеный эвкалипт в вазе, теплое студийное освещение, богатые текстуры, кинематографичное качество 8k.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693201/PROMPTS/tzaf6stybcvlyex0nrzz.jpg"
   },
   {
     "id": 61,
-    "category": "Арт",
-    "text": "Extreme action sports фотоgraphy. A snowboarder carving down a steep alpine slope. The massive spray of powder snow morphs into a snarling giant wolf head. Vibrant orange jacket vs pristine white and blue mountain. High-speed descent, ice crystals, epic nature VFX art.",
-    "url": "https://pbs.twimg.com/media/G6uALlmWkAAXwYN.jpg"
+    "category": "Фантастика",
+    "promt": "Фотография экстремальных видов спорта. Сноубордист несется вниз по крутому альпийскому склону. Огромный шлейф снежной пыли превращается в рычащую гигантскую голову волка. Яркая оранжевая куртка контрастирует с нетронутой белой и синей горой. Скоростной спуск, кристаллы льда, эпичное природное VFX-искусство.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693202/PROMPTS/xks5mozfqth6ckbjacuw.jpg"
   },
   {
     "id": 62,
-    "category": "Арт",
-    "text": "High-energy sports commercial art. An elite sprinter on a track at ночь, pursued by a colossal stallion formed entirely of black smoke, embers, and magma. Rim освещение, heat haze distortion, sweating skin reflecting the fire light. Overwhelming power, intense orange and black tones.",
-    "url": "https://pbs.twimg.com/media/G6uBK_3WwAADhM-.jpg"
+    "category": "Фантастика",
+    "promt": "Высокоэнергичный спортивный коммерческий арт. Элитный спринтер на беговой дорожке ночью, преследуемый колоссальным жеребцом, полностью состоящим из черного дыма, тлеющих углей и магмы. Контурное освещение (rim lighting), искажение от теплового марева, потная кожа отражает свет огня. Ошеломляющая мощь, интенсивные оранжевые и черные тона.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693203/PROMPTS/borzjdfgdpjllqqfqx2e.jpg"
   },
   {
     "id": 63,
-    "category": "Повседневный",
-    "text": "Яркий уличный селфи during золотой час. A человек in a red checkered dress holding a wicker basket filled with strawberries. Background of a green grass field, wildflowers, and a picnic blanket with a strawberry cake. Тёплый golden sunlight, мягкий glowy skin, playful and sweet mood.",
-    "url": "https://pbs.twimg.com/media/G6w6LNPawAAhswG.jpg"
+    "category": "Уличная мода",
+    "promt": "Яркое селфи на улице во время золотого часа. Человек в красном клетчатом платье держит плетеную корзину, наполненную клубникой. Фон: поле зеленой травы, полевые цветы и плед для пикника с клубничным тортом. Теплый золотистый солнечный свет, мягкая сияющая кожа, игривое и милое настроение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693204/PROMPTS/ludjhgweowzylaa9b9kx.jpg"
   },
   {
     "id": 64,
-    "category": "Киношный",
-    "text": "2000s digital camera aesthetic (Canon IXUS). A человек with narrow glasses in a pool at ночь, arm resting on the edge. Black string-tie bikini, wet skin reflecting the direct flash. Background of white lounge chairs and folded umbrellas. Тёплый dim glow, quiet and subtly sexy vibe.",
-    "url": "https://pbs.twimg.com/media/G6r9b-LaEAAcz90.jpg"
+    "category": "Ретро стиль",
+    "promt": "Эстетика цифровых камер 2000-х (Canon IXUS). Человек в узких очках в бассейне ночью, рука опирается на бортик. Черное бикини на завязках, влажная кожа отражает свет прямой вспышки. На заднем плане белые шезлонги и сложенные зонтики. Теплое тусклое свечение, тихая и слегка сексуальная атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693205/PROMPTS/pfm1rlbyxvpmadwlqeb5.jpg"
   },
   {
     "id": 65,
-    "category": "Арт",
-    "text": "Mixed-media фотоgraphy. A street-dancer crouching on a subway platform with large headphones. Surrounded by a chaotic explosion of 2D graffiti-style musical doodles boomboxes with teeth, flying notes, and lightning bolts. Urban rhythmic vibe, electric blue and pink tones.",
-    "url": "https://pbs.twimg.com/media/G6sRhg4WAAAivZf.jpg"
+    "category": "Фантастика",
+    "promt": "Фотография в смешанной технике (mixed-media). Уличный танцор сидит на корточках на платформе метро в больших наушниках. Окружен хаотичным взрывом 2D музыкальных дудлов в стиле граффити: зубастые бумбоксы, летающие ноты и молнии. Урбанистическая ритмичная атмосфера, цвета электрик и розовые тона.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693205/PROMPTS/rxn7mzcsnwyvhfqk100e.jpg"
   },
   {
     "id": 66,
-    "category": "Ретро",
-    "text": "Гиперреалистичный кинематографичный крупный план портрет of a face covered in natural water droplets. Тёплый late afternoon золотой час light, мягкий realistic contrast. Hasselblad 8k фотоgraphy, microtextural skin details, pores, and freckles. Intimate and detailed beauty aesthetic.",
-    "url": "https://pbs.twimg.com/media/G6qTZIFWoAA-ZR2.jpg"
+    "category": "Кино портреты",
+    "promt": "Гиперреалистичный кинематографичный крупный план лица, покрытого естественными каплями воды. Теплый свет позднего полудня (золотой час), мягкий реалистичный контраст. Фотография Hasselblad 8k, микротекстурные детали кожи, поры и веснушки. Интимная и детализированная эстетика красоты.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693206/PROMPTS/kzyqzzkt6pjcyzi5udzg.jpg"
   },
   {
     "id": 67,
-    "category": "Арт",
-    "text": "Pastel street фотоgraphy overwhelmed by a dense maximalist sweets-monster pop-art cluster. A человек sitting on a concrete barrier surrounded by flat neon 2D creatures banana ghosts, donut monsters, and gummy worms. Vibrant, сюрреалистичный, and playful Gen-Z aesthetic.",
-    "url": "https://pbs.twimg.com/media/G6q5NkLWUAA6OH-.jpg"
+    "category": "Фантастика",
+    "promt": "Пастельная уличная фотография, переполненная плотным максималистичным поп-арт скоплением конфетных монстров. Человек сидит на бетонном барьере в окружении плоских неоновых 2D-существ: банановых призраков, пончиковых монстров и мармеладных червяков. Яркая, сюрреалистичная и игривая эстетика поколения Z.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693207/PROMPTS/kmbvvvyxrlen9azuvgyk.jpg"
   },
   {
     "id": 68,
-    "category": "Повседневный",
-    "text": "A cozy digital picture of a человек at a Chicago Christmas Market. Holding a mug of hot cocoa, laughing under a light snowfall. Blurred market stalls with festive lights and holiday decorations in the фон. Тёплый, authentic, and joyful winter vibe.",
-    "url": "https://pbs.twimg.com/media/G6u-2V-XAAAVryt.jpg"
+    "category": "Уличная мода",
+    "promt": "Уютная цифровая фотография человека на рождественской ярмарке в Чикаго. Держит кружку горячего какао, смеется под легким снегопадом. Размытые торговые палатки с праздничными огнями и новогодними украшениями на заднем плане. Теплая, аутентичная и радостная зимняя атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693208/PROMPTS/slipqwtemhjlh838jt2b.jpg"
   },
   {
     "id": 69,
-    "category": "Ретро",
-    "text": "A nostalgic digital camera фото from late October 2006 in Times Square. Busy street scene with fall vibes. Early 2000s low-megapixel aesthetic, slightly overexposed, featuring a classic printed orange digital timestamp in the corner. Authentic ретро-digital look.",
-    "url": "https://pbs.twimg.com/media/G6u-YFhW8AArZOt.jpg"
+    "category": "Ретро стиль",
+    "promt": "Ностальгическое фото на цифровую камеру конца октября 2006 года на Таймс-сквер. Оживленная уличная сцена с осенней атмосферой. Низкомегапиксельная эстетика начала 2000-х, легкая передержка, классический напечатанный оранжевый цифровой штамп времени в углу. Аутентичный ретро-цифровой вид.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693209/PROMPTS/hzfagmo9vs4pn7vysysr.jpg"
   },
   {
     "id": 70,
-    "category": "Арт",
-    "text": "An amateur 1998 film фотоgraph of an artist in a студия. The artist is painting an oil canvas that shows a recursive image of themselves painting. Messy студия фон with oil paints and a винтажный computer monitor. Mind-bending artistic concept, grain and nostalgia.",
-    "url": "https://pbs.twimg.com/media/G6U8rOkXwAABEUg.jpg"
+    "category": "Ретро стиль",
+    "promt": "Любительская пленочная фотография 1998 года художника в студии. Художник пишет маслом холст, на котором изображено рекурсивное изображение его самого за рисованием. Захламленный фон студии с масляными красками и винтажным компьютерным монитором. Искажающая сознание художественная концепция, зерно и ностальгия.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693210/PROMPTS/jadpv9bw72bjp1lidm11.jpg"
   },
   {
     "id": 71,
-    "category": "Ретро",
-    "text": "A сюрреалистичный Y2K зеркало селфи. The человек holds a novelty bright yellow banana-shaped landline phone converted into a digital camera. Harsh on-camera flash, metallic silver futuristic top, electric blue walls with Matrix posters in the фон. Nostalgic tech-geek vibe.",
-    "url": "https://pbs.twimg.com/media/G6T7rFKWYAA0UYU.jpg"
+    "category": "Ретро стиль",
+    "promt": "Сюрреалистичное Y2K селфи в зеркале. Человек держит забавный стационарный телефон в форме ярко-желтого банана, переделанный в цифровую камеру. Резкая накамерная вспышка, металлический серебристый футуристичный топ, синие электрик стены с постерами \"Матрицы\" на фоне. Ностальгическая техно-гик атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693211/PROMPTS/galbqjtzdbwectinbwd2.jpg"
   },
   {
     "id": 72,
-    "category": "Арт",
-    "text": "Artistic monochrome composition. A человек seated elegantly on the floor in a modern black top and grey sneakers. The фон features a мягкий, giant крупный план side profile of the same face in black and white. Minimalist, high-fashion, and deeply artistic mood.",
-    "url": "https://pbs.twimg.com/media/G6mI0S-bwAIlhOj.jpg"
+    "category": "Уличная мода",
+    "promt": "Художественная монохромная композиция. Человек элегантно сидит на полу в современном черном топе и серых кроссовках. На фоне — мягкий, гигантский крупный план профиля того же лица в черно-белом цвете. Минималистичное, высокомодное и глубоко художественное настроение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693212/PROMPTS/d5kpsf8ym4m9rwhywdkv.jpg"
   },
   {
     "id": 73,
-    "category": "Киношный",
-    "text": "A professional портрет of a человек looking back over their shoulder with an intense, alluring expression. На нём a form-fitting dark navy dress. Dimly lit minimalist room with dark blue-grey walls. Dramatic side-освещение, высокий контраст, атмосферный and sophisticated.",
-    "url": "https://pbs.twimg.com/media/G6lSUWebAAEc4Rl.jpg"
+    "category": "Кино портреты",
+    "promt": "Профессиональный портрет человека, оглядывающегося через плечо с интенсивным, манящим выражением лица. Одет в облегающее темно-синее платье. Тускло освещенная минималистичная комната с темно-сине-серыми стенами. Драматичное боковое освещение, высокий контраст, атмосферно и утонченно.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693213/PROMPTS/ammdtvysd1f3vw2m7q5a.jpg"
   },
   {
     "id": 74,
-    "category": "Повседневный",
-    "text": "Гиперреалистичный DSLR портрет. A человек sitting casually on modern dark-wood в помещении stairs against a curved white wall. На нём high-waisted frayed jeans and high heels with steel laces. Мягкий natural освещение from above, clean minimalist interior, мягкий плёночное зерно.",
-    "url": "https://pbs.twimg.com/media/G6kOmeQbwAUKjeA.jpg"
+    "category": "Уличная мода",
+    "promt": "Гиперреалистичный портрет на DSLR камеру. Человек непринужденно сидит на современной внутренней лестнице из темного дерева на фоне изогнутой белой стены. Надеты джинсы с высокой талией с потертостями и туфли на высоком каблуке со стальной шнуровкой. Мягкое естественное освещение сверху, чистый минималистичный интерьер, мягкое зерно пленки.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693214/PROMPTS/id5hiud3wumodqrhjb8l.jpg"
   },
   {
     "id": 75,
-    "category": "Повседневный",
-    "text": "Редакционная fashion-фотография человека, сидящего в светло-серой студии. На нём объёмная кремовая дублёнка из овчины и джинсовая рубашка. Расслабленная поза, акцент на тактильной фактуре ткани, мягкий студийный свет и премиальная модная эстетика.",
-    "url": "https://pbs.twimg.com/media/G6l2B-RawAEYQhu.jpg"
+    "category": "Уличная мода",
+    "promt": "Журнальное фэшн-фото в светло-серой студии. Сидящий человек одет в лохматую кремовую куртку из овчины и джинсовую рубашку. Расслабленная поза, акцент на тактильных текстурах и мягких пушистых материалах. Мягкое естественное студийное освещение, нежный боковой рисующий свет, атмосфера высокой моды.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693216/PROMPTS/nvbzwc0x9qmm2ejtgk0t.jpg"
   },
   {
     "id": 76,
-    "category": "Киношный",
-    "text": "Neo-Noir кинематографичный кадр. A lone человек acting as a detective, sitting in a dimly lit, rain-streaked diner booth at 3 AM. A red neon sign outside casts a harsh crimson glow on their face. Wide-angle кадр, volumetric fog, high-tension narrative atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6lyVG_b0AEaoFj.jpg"
+    "category": "Кино портреты",
+    "promt": "Нео-нуарный кинематографичный кадр. Одинокий человек в роли детектива сидит в тускло освещенной, залитой дождем кабинке закусочной в 3 часа ночи. Красная неоновая вывеска снаружи отбрасывает резкое багровое свечение на лицо. Широкоугольный кадр, объемный туман, атмосфера повествования с высоким напряжением.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693216/PROMPTS/dprskacvxb9n7cc6tihv.jpg"
   },
   {
     "id": 77,
-    "category": "Киношный",
-    "text": "Raw Y2K ночь-фото style. A couple sitting close together in a car backseat at ночь. Strong direct frontal flash, foggy car windows with raindrops. Тёплый blurred city lights outside, высокий контраст, intimate and peaceful mood, realistic плёночное зерно.",
-    "url": "https://pbs.twimg.com/media/G6lTK_eWEAEwfKD.jpg"
+    "category": "Ретро стиль",
+    "promt": "Сырой стиль ночного фото Y2K. Пара сидит близко друг к другу на заднем сиденье автомобиля ночью. Сильная прямая фронтальная вспышка, запотевшие окна автомобиля с каплями дождя. Теплые размытые огни города снаружи, высокий контраст, интимная и умиротворенная атмосфера, реалистичное зерно пленки.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693217/PROMPTS/zoo59qywv5ugm5jeinln.jpg"
   },
   {
     "id": 78,
-    "category": "Киношный",
-    "text": "A крупный план кадр of a compact digital camera screen. On the screen is a candid ночь фото of a человек в помещенииs, illuminated by a bright built-in flash. Surrounding the screen are physical buttons and dials of the camera. Raw, nostalgic, early 2000s snapкадр aesthetic.",
-    "url": "https://pbs.twimg.com/media/G6j9tDvbwAEBxb3.jpg"
+    "category": "Ретро стиль",
+    "promt": "Крупный план экрана компактной цифровой камеры Canon. На экране — откровенное ночное фото человека в помещении, освещенное яркой встроенной вспышкой. Вокруг экрана видны физические кнопки и диски управления камерой. Сырая, ностальгическая эстетика снэпшотов начала 2000-х.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693219/PROMPTS/j3mmihbof15yy3ajeov3.jpg"
   },
   {
     "id": 79,
-    "category": "Арт",
-    "text": "A highly stylized 3D caricature of a человек with expressive facial features and playful exaggeration. Rendered in a smooth, polished Pixar-style with clean materials and мягкий ambient освещение. Bold solid color фон, charming and charismatic character design.",
-    "url": "https://pbs.twimg.com/media/G6l3a2waAAAKXWQ.jpg"
+    "category": "Фантастика",
+    "promt": "Сильно стилизованная 3D-карикатура человека с выразительными чертами лица и игривым преувеличением. Отрендерено в гладком, полированном стиле Pixar с чистыми материалами и мягким окружающим освещением (ambient lighting). Яркий однотонный фон, очаровательный и харизматичный дизайн персонажа.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693220/PROMPTS/q1dn5hwkhyaqqdda0amx.jpg"
   },
   {
     "id": 80,
-    "category": "Повседневный",
-    "text": "Cozy morning winter портрет in a снежный park. A человек in a cream-colored knitted hoodie holding a fluffy small white puppy. Fresh snowfall, bare trees with frost, pale sunlight. 50mm lens портрет, shallow depth of field, affectionate and calm atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6keMPLbcAAJiPz.jpg"
+    "category": "Уличная мода",
+    "promt": "Уютный утренний зимний портрет в заснеженном парке. Человек в кремовом вязаном худи держит пушистого маленького белого щенка. Свежевыпавший снег, голые деревья с инеем, бледный солнечный свет. Портрет на объектив 50мм, малая глубина резкости, ласковая и спокойная атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693222/PROMPTS/ryantorhrll9nvc1g6t6.jpg"
   },
   {
     "id": 81,
-    "category": "Повседневный",
-    "text": "в стиле Instagram 8k портрет. A человек sitting in a trendy кафе with warm ambient освещение and latte-toned decor. Relaxed pose with chin resting on hand. На нём a modern denim jacket, мягкий smile. Film-like mood, cozy aesthetic, perfect social media profile кадр.",
-    "url": "https://pbs.twimg.com/media/G6ho0G5bEAAlBjC.jpg"
+    "category": "Уличная мода",
+    "promt": "Портрет в стиле Instagram в разрешении 8k. Человек сидит в модном кафе с теплым окружающим освещением и декором в тонах латте. Расслабленная поза, подбородок опирается на руку. Одет в современную джинсовую куртку, мягкая улыбка. Настроение пленочной фотографии, уютная эстетика, идеальный кадр для профиля в соцсетях.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693223/PROMPTS/eod0vnr0mttzwtw1rswr.jpg"
   },
   {
     "id": 82,
-    "category": "Киношный",
-    "text": "Close-up портрет from a low angle. A человек in a black hoodie with a confident gaze. Dramatic chiaroscuro освещение with a faint red neon light from the side creating sharp highlights. Тёмный shadowed фон, кинематографичный detail, visible skin pores and fabric texture.",
-    "url": "https://pbs.twimg.com/media/G6gSnlXbgAAk_2M.jpg"
+    "category": "Уличная мода",
+    "promt": "Крупный план с нижнего ракурса. Человек в черном худи с уверенным взглядом. Драматичное освещение кьяроскуро (светотень) с тусклым красным неоновым светом сбоку, создающим резкие блики. Темный затененный фон, кинематографичная детализация, видимые поры кожи и текстура ткани.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693224/PROMPTS/zumgorghaulmninjmurp.jpg"
   },
   {
     "id": 83,
-    "category": "Повседневный",
-    "text": "Гиперреалистичный широкоугольный street-кафе POV фото. The человек extends their hand toward the camera holding a cup of matcha latte, creating an exaggerated крупный план foreground perspective. Slight fisheye distortion, natural уличный освещение, candid everyday city mood.",
-    "url": "https://pbs.twimg.com/media/G6kujftbwAQ2TH_.jpg"
+    "category": "Уличная мода",
+    "promt": "Гиперреалистичное широкоугольное POV-фото в уличном кафе. Человек протягивает руку к камере, держа чашку матча латте, создавая утрированный крупный план на переднем фоне. Легкое искажение \"рыбий глаз\", естественное уличное освещение, откровенное повседневное городское настроение.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693225/PROMPTS/s8uvrkvzhz0rcw5y22c5.jpg"
   },
   {
     "id": 84,
-    "category": "Повседневный",
-    "text": "Professional editorial-grade портрет. A человек leaning casually against a clean light-grey wall in a modern office. На нём a professional black shirt and carrot-color trousers with a black belt. Neutral в помещении tones, clean highlights, confident and approachable aura.",
-    "url": "https://pbs.twimg.com/media/G6k0DJObwAEm4fs.jpg"
+    "category": "Кино портреты",
+    "promt": "Профессиональный портрет журнального уровня. Человек непринужденно прислонился к чистой светло-серой стене в современном офисе. Одет в строгую черную рубашку и терракотовые брюки с черным ремнем. Нейтральные тона интерьера, чистые блики, уверенная и располагающая аура.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693226/PROMPTS/dj9sqkb9jjhgf7phnbcn.jpg"
   },
   {
     "id": 85,
-    "category": "Ретро",
-    "text": "A cozy, warm, and romantic scene on a luxurious bed. A человек in bright red satin pajamas hugging a large fluffy red teddy bear. Тёплый glow from a bedside lamp, red curtains in the фон. Luxurious textures of satin and fur, intimate home atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6iMlgcWIAAuEZG.jpg"
+    "category": "Кино портреты",
+    "promt": "Уютная, теплая и романтическая сцена на роскошной кровати. Человек в ярко-красной атласной пижаме обнимает большого пушистого красного плюшевого медведя. Теплое свечение от прикроватной лампы, красные шторы на заднем плане. Роскошные текстуры атласа и меха, интимная домашняя атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693227/PROMPTS/eyommycicxmfz6h6gjws.jpg"
   },
   {
     "id": 86,
-    "category": "Ретро",
-    "text": "Faded Kodachrome 64 aesthetic. A человек in a burgundy polka-dot dress leaning out of an open window of a moving винтажный train car. Wistful expression, steam from the engine blowing past. Background of an old grand train station, heavy кинематографичный grain, nostalgic longing.",
-    "url": "https://pbs.twimg.com/media/G6heJGIbMAARLlm.jpg"
+    "category": "Ретро стиль",
+    "promt": "Эстетика выцветшей пленки Kodachrome 64. Человек в бордовом платье в горошек высовывается из открытого окна движущегося винтажного вагона поезда. Задумчивое выражение лица, пар от паровоза проносится мимо. На заднем плане старый величественный железнодорожный вокзал, тяжелое кинематографичное зерно, ностальгическая тоска.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693228/PROMPTS/gpn9refguhe6v6pt5dn3.jpg"
   },
   {
     "id": 87,
-    "category": "Арт",
-    "text": "Ультрареалистичный кинематографичный winter портрет arranged in a vertical triptych (3 panels). A человек in a black jacket in a smoky village landscape. Top panel Back view facing the снежный distance. Middle and bottom Close-up кинематографичный портретs. Deep blue evening sky, warm campfire glow.",
-    "url": "https://pbs.twimg.com/media/G6iCUhhbUAE5GsM.jpg"
+    "category": "Кино портреты",
+    "promt": "Ультрареалистичный кинематографичный зимний портрет, оформленный в виде вертикального триптиха (3 панели). Человек в черной куртке в дымном деревенском пейзаже. Верхняя панель: вид со спины, смотрит в заснеженную даль. Средняя и нижняя: крупные кинематографичные портреты. Глубокое синее вечернее небо, теплое свечение костра.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693229/PROMPTS/et8xofszy1qvwfvxguxm.jpg"
   },
   {
     "id": 88,
-    "category": "Повседневный",
-    "text": "A stunningly beautiful портрет of a человек sitting at a wooden table in a sunlit cafe. На нём a chunky oversized pastel yellow knit sweater. Chin resting in hands, looking directly at the camera. Тёплый золотой час sunlight, strong shadows, cozy high-quality 8k bokeh.",
-    "url": "https://pbs.twimg.com/media/G6j4DORWYAAtcFm.jpg"
+    "category": "Кино портреты",
+    "promt": "Потрясающе красивый портрет человека, сидящего за деревянным столом в залитом солнцем кафе. Одет в объемный оверсайз пастельно-желтый вязаный свитер. Подбородок покоится на руках, смотрит прямо в камеру. Теплый солнечный свет золотого часа, сильные тени, уютное высококачественное 8k боке.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693230/PROMPTS/voikcrrruqsipm6ap81f.jpg"
   },
   {
     "id": 89,
-    "category": "Ретро",
-    "text": "A hand-colored doodle sketch on lined notebook paper. The человек is drawn with firm ink outlines and energetic marker strokes in red and yellow. Surrounded by handwritten notes like 'STRATEGY', 'CAMERA', 'BUSINESS'. Messy construction lines, visible paper grain, unique artistic style.",
-    "url": "https://pbs.twimg.com/media/G6iTzsCboAA5QYa.jpg"
+    "category": "Фантастика",
+    "promt": "Раскрашенный вручную дудл-скетч на линованной тетрадной бумаге. Человек нарисован твердыми чернильными контурами и энергичными штрихами маркера в красном и желтом цветах. Окружен рукописными заметками вроде \"СТРАТЕГИЯ\", \"КАМЕРА\", \"БИЗНЕС\". Неряшливые линии построения, видимая текстура бумаги, уникальный художественный стиль.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693232/PROMPTS/y3wsjuylhrxzh2yteqfy.jpg"
   },
   {
     "id": 90,
-    "category": "Киношный",
-    "text": "Candid ночь street портрет. A человек leaning against a bright yellow Ferrari F8 on a dark city street. High contrast flash фотоgraphy, 35mm film style. На нём an army green knit vest and black shorts. Blurred neon signs and car headlights in the фон, raw and gritty urban vibe.",
-    "url": "https://pbs.twimg.com/media/G6iBftkW0AALYJf.jpg"
+    "category": "Уличная мода",
+    "promt": "Откровенный ночной уличный портрет. Человек прислонился к ярко-желтой Ferrari F8 на темной городской улице. Высококонтрастная фотография со вспышкой, стиль 35-мм пленки. Одет в армейско-зеленую вязаную жилетку и черные шорты. Размытые неоновые вывески и фары автомобилей на заднем плане, сырая и суровая урбанистическая атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693233/PROMPTS/m2xieguwdfiitigrmz9r.jpg"
   },
   {
     "id": 91,
-    "category": "Киношный",
-    "text": "A tough стритвир fashion портрет. A человек in a dark hoodie and cargo pants, holding a metallic baseball bat with a confident, defiant attitude. Backdrop of thick smoke and distant fire, industrial атмосферный aesthetic. Punk-grunge vibe, кинематографичный освещение, high-energy urban unrest scene.",
-    "url": "https://pbs.twimg.com/media/G6clKdZaAAAzBEI.jpg"
+    "category": "Уличная мода",
+    "promt": "Жесткий фэшн-портрет в стиле уличной одежды. Человек в темном худи и штанах карго держит металлическую бейсбольную биту с уверенным, вызывающим настроем. На фоне густой дым и далекий огонь, индустриальная мрачная эстетика. Панк-гранж вайб, кинематографичное освещение, высокоэнергичная сцена городских беспорядков.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693234/PROMPTS/onbzeatdafixsdzvfmwn.jpg"
   },
   {
     "id": 92,
-    "category": "Арт",
-    "text": "Extreme крупный план портрет of a rugged man looking intensely over the rim of small, round, yellow-tinted metal sunglasses. Piercing eyes, messy dark wavy hair, thick mustache. Dramatic chiaroscuro освещение, deep атмосферный shadows. разрешение 8K, visible pores and skin texture, Unreal Engine 5 render style.",
-    "url": "https://pbs.twimg.com/media/G6hd-0eb0AAd_JS.jpg"
+    "category": "Кино портреты",
+    "promt": "Экстремальный крупный план сурового мужчины, напряженно смотрящего поверх маленьких круглых металлических очков с желтыми стеклами. Пронзительные глаза, растрепанные темные волнистые волосы, густые усы. Драматичное освещение кьяроскуро, глубокие мрачные тени. Разрешение 8k, видимые поры и текстура кожи, стиль рендера Unreal Engine 5.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693235/PROMPTS/rudq04uv6syug8natwdz.jpg"
   },
   {
     "id": 93,
-    "category": "Арт",
-    "text": "Ультрареалистичный портрет of a человек standing confidently in a luxury futuristic cruise-ship atrium during золотой час. Immense geometric glass dome ceiling casting amber reflections on polished metal. Ocean horizon visible through the glass. High-end fashion aesthetic, elegant and кинематографичный.",
-    "url": "https://pbs.twimg.com/media/G6fHB9wbgAE3FEK.jpg"
+    "category": "Фантастика",
+    "promt": "Ультрареалистичный портрет человека, уверенно стоящего в атриуме роскошного футуристического круизного лайнера во время золотого часа. Огромный геометрический стеклянный куполообразный потолок отбрасывает янтарные отражения на полированный металл. Сквозь стекло виден горизонт океана. Эстетика высокой моды, элегантно и кинематографично.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693235/PROMPTS/nf3fb3rmsazpofluxigr.jpg"
   },
   {
     "id": 94,
-    "category": "Арт",
-    "text": "Raw широкоугольный engineering camera footage from the Mars surface. Extreme fisheye lens distortion. A крупный план 'селфи' of an astronaut in a dusty, scuffed futuristic space suit (helmet off) peering into the rover's lens. Harsh direct sunlight, deep black shadows, digital timestamp 'SOL 001'.",
-    "url": "https://pbs.twimg.com/media/G6dUorzbIAA0ujs.jpg"
+    "category": "Фантастика",
+    "promt": "Сырые широкоугольные кадры с инженерной камеры на поверхности Марса. Экстремальное искажение объектива \"рыбий глаз\". Крупный план — \"селфи\" астронавта в пыльном, потертом футуристическом скафандре (шлем снят), смотрящего в объектив марсохода. Резкий прямой солнечный свет, глубокие черные тени, цифровой штамп времени \"SOL 001\".",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693237/PROMPTS/dfatsaua9aagc5zrlnfq.jpg"
   },
   {
     "id": 95,
-    "category": "Ретро",
-    "text": "A high-energy обложка игры для PlayStation 5 in the style of GTA VI. The человек is the main character, в образе с modern LA стритвир and sunglasses. Neon Los Angeles фон with palm trees, skyscrapers, and luxury cars. Dramatic panel layout, glossy poster finish, bold Rockstar-style typography.",
-    "url": "https://pbs.twimg.com/media/G6dNvGtXIAAoZeZ.jpg"
+    "category": "Фантастика",
+    "promt": "Высокоэнергичная обложка игры для PlayStation 5 в стиле GTA VI. Человек в роли главного героя, одет в современную уличную одежду Лос-Анджелеса и солнцезащитные очки. Неоновый фон Лос-Анджелеса с пальмами, небоскребами и роскошными автомобилями. Драматичная компоновка панелей, глянцевое покрытие постера, смелая типографика в стиле Rockstar.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693238/PROMPTS/s3g4ckojs6y8dqpyazhb.jpg"
   },
   {
     "id": 96,
-    "category": "Арт",
-    "text": "A драматичный кинематографичный moment. A человек is surrounded by fragments of metallic clockwork objects suspended in mid-air. Reaching out a hand toward a glowing crystal shard. High contrast освещение, shards of gears and clock faces reflecting light. Intense, action-oriented fantasy atmosphere.",
-    "url": "https://pbs.twimg.com/media/G6ScGWCa8AAHcuL.jpg"
+    "category": "Фантастика",
+    "promt": "Драматичный кинематографичный момент. Человек окружен фрагментами металлических часовых механизмов, застывших в воздухе. Протягивает руку к светящемуся кристаллическому осколку. Высококонтрастное освещение, осколки шестеренок и циферблатов отражают свет. Интенсивная, насыщенная действием фэнтезийная атмосфера.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693238/PROMPTS/zbxuptbjpcp5nb9ij5ed.jpg"
   },
   {
     "id": 97,
-    "category": "Ретро",
-    "text": "A trendy Instagram 'фото dump' grid showing 9 different images of a человек's life a зеркало селфи, a cozy кафе кадр, a blurry party фото, a laptop work session, a sunset, and a candid laugh. Mixed освещение, realistic smartphone фотоgraphy aesthetic, authentic social media vibe.",
-    "url": "https://pbs.twimg.com/media/G6P_hk7XwAAZGuo.jpg"
+    "category": "Уличная мода",
+    "promt": "Трендовая карусель \"photo dump\" для Instagram (сетка из 9 разных фото), показывающая жизнь человека: селфи в зеркале, уютный кадр в кафе, размытое фото с вечеринки, рабочий процесс за ноутбуком, закат и искренний смех. Смешанное освещение, реалистичная эстетика мобильной фотографии, аутентичная атмосфера соцсетей.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693239/PROMPTS/scoodi9lnn2j4iirvseh.jpg"
   },
   {
     "id": 98,
-    "category": "Повседневный",
-    "text": "Intimate editorial fashion портрет. A человек в образе с a colorful textured crochet cardigan and a matching headscarf. A fluffy orange cat is relaxing on their shoulder. Intense backlit sunlight with lens flares, dreamy high-contrast summer aesthetic, vibrant blue sky фон.",
-    "url": "https://pbs.twimg.com/media/G6RsHgQbIAANtUe.jpg"
+    "category": "Уличная мода",
+    "promt": "Интимный журнальный фэшн-портрет. Человек в красочном текстурированном кардигане крупной вязки (кроше) и подходящем платке на голове. На плече уютно устроился пушистый рыжий кот. Интенсивный контровой солнечный свет с бликами в объективе, мечтательная высококонтрастная летняя эстетика, фон ярко-синего неба.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693240/PROMPTS/d9lcrssk4qxnmmvssbik.jpg"
   },
   {
     "id": 99,
-    "category": "Арт",
-    "text": "Кинематографичный в полный рост портрет of a rugged человек holding a gear, standing beside an old rusted helicopter on an abandoned farm. Worn leather jacket, dusty jeans, and boots. Dry cracked ground, драматичный gray overcast sky, tense atmosphere, кинематографичный освещение, мягкий depth of field.",
-    "url": "https://pbs.twimg.com/media/G6RDuoOX0AA0cZG.jpg"
+    "category": "Кино портреты",
+    "promt": "Молодая европейская женщина, примерно 25-30 лет, стоит в центре композиции. Она одета в элегантное, длинное белое платье в греческом стиле с глубоким V-образным вырезом, плиссированной юбкой и драпировкой, переходящей в накидку. Платье украшено сверкающими кристаллами на плечах и поясе, а также изящными браслетами на запястьях. У нее светлые волосы, собранные в элегантную прическу, и спокойное, задумчивое выражение лица. Она слегка повернута в три четверти, глядя в сторону. Вокруг нее расположены античные статуи и колонны, создавая атмосферу музея или галереи. Освещение мягкое, боковое, с тенями, подчеркивающими драпировки платья и скульптур. Перспектива фронтальная, на уровне глаз, создавая ощущение присутствия. Цветовая палитра нейтральная, с преобладанием белых, серых и бледно-голубых тонов. Стиль изображения – классический, элегантный, с акцентом на изящество и красоту.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693241/PROMPTS/cd1koxiinbeslrqsxp0y.jpg"
   },
   {
     "id": 100,
-    "category": "Арт",
-    "text": "Гиперреалистичный wide street кадр. A человек standing beside a vibrant, colorful anime mural wall on a sidewalk. На нём a chic pastel blazer and sleek white leather sneakers. A драматичный diagonal shaft of sunlight illuminates the человек, creating deep contrasting shadows. Кинематографичный 35mm lens.",
-    "url": "https://pbs.twimg.com/media/G6Rls_QasAA6L_Q.jpg"
+    "category": "Уличная мода",
+    "promt": "Кинематографичный портрет в полный рост: суровый человек держит шестеренку, стоя рядом со старым ржавым вертолетом на заброшенной ферме. Потертая кожаная куртка, пыльные джинсы и ботинки. Сухая потрескавшаяся земля, драматичное серое пасмурное небо, напряженная атмосфера, кинематографичное освещение, мягкая глубина резкости.",
+    "url": "https://res.cloudinary.com/dpbomqf1s/image/upload/v1773693242/PROMPTS/fi0gxpbwppk8hgbulg5s.jpg"
   }
 ]
