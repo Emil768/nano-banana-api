@@ -893,7 +893,6 @@ app.get("/auth/google/callback", async (req, res) => {
 
     const tokenJson = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || !tokenJson.access_token) {
-      console.error("google token error", tokenRes.status, tokenJson);
       return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=token_exchange`);
     }
 
@@ -915,28 +914,32 @@ app.get("/auth/google/callback", async (req, res) => {
 
     let user = await getUserByChatId(chatId);
     if (!user && AUTO_CREATE_USER) {
-      user = await createUserIfMissing(chatId);
+      try {
+        user = await createUserIfMissing(chatId);
+      } catch (_createErr) {
+        return res.redirect(
+          `${FRONTEND_ERROR_REDIRECT}&reason=create_user_failed`
+        );
+      }
     }
 
     if (!user) {
-      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=user_not_created`);
-    }
-
-    const picture = String(profile.picture || "").trim();
-    if (picture && supabase) {
-      const { error: photoErr } = await supabase
-        .from(SUPABASE_USERS_TABLE)
-        .update({ photo_url: picture })
-        .eq(SUPABASE_CHAT_ID_COLUMN, chatId);
-      if (photoErr) {
-        console.warn("google profile photo update", photoErr.message);
+      if (!supabase) {
+        return res.redirect(
+          `${FRONTEND_ERROR_REDIRECT}&reason=no_supabase`
+        );
       }
+      if (!AUTO_CREATE_USER) {
+        return res.redirect(
+          `${FRONTEND_ERROR_REDIRECT}&reason=auto_create_off`
+        );
+      }
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=user_not_created`);
     }
 
     setChatCookies(req, res, chatId);
     return res.redirect(buildSuccessRedirectUrl(chatId));
-  } catch (error) {
-    console.error("google callback error", error);
+  } catch (_error) {
     return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=server_error`);
   }
 });
