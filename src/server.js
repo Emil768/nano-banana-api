@@ -43,6 +43,11 @@ const TELEGRAM_BOT_TOKEN = normalizeEnv(process.env.TELEGRAM_BOT_TOKEN);
 const TELEGRAM_WIDGET_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_WIDGET_MAX_AGE_SECONDS || 300
 );
+
+const GOOGLE_CLIENT_ID = normalizeEnv(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_SECRET = normalizeEnv(process.env.GOOGLE_CLIENT_SECRET);
+/** Явный redirect URI из Google Cloud Console (если задан — используется вместо авто). */
+const GOOGLE_REDIRECT_URI_ENV = normalizeEnv(process.env.GOOGLE_REDIRECT_URI);
 const AUTH_SESSION_SECRET =
   normalizeEnv(process.env.AUTH_SESSION_SECRET) || TELEGRAM_BOT_TOKEN;
 
@@ -280,6 +285,26 @@ function createSessionToken(chatId) {
     .update(base)
     .digest("hex");
   return `${base}.${sig}`;
+}
+
+function getBackendPublicUrl(req) {
+  const fromEnv = normalizeEnv(process.env.BACKEND_PUBLIC_URL).replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+
+  const railway = normalizeEnv(process.env.RAILWAY_PUBLIC_DOMAIN);
+  if (railway) return `https://${railway}`;
+
+  const proto = String(req.get("x-forwarded-proto") || req.protocol || "https");
+  const host = String(req.get("host") || "");
+  if (host) return `${proto}://${host}`;
+
+  return "";
+}
+
+function resolveGoogleRedirectUri(req) {
+  if (GOOGLE_REDIRECT_URI_ENV) return GOOGLE_REDIRECT_URI_ENV;
+  const base = getBackendPublicUrl(req);
+  return base ? `${base}/auth/google/callback` : "";
 }
 
 function verifySessionToken(tokenValue) {
@@ -555,9 +580,9 @@ function resolveChatIdFromRequest(req, options = {}) {
 function requireChatId(req, res, next) {
   const chatId = resolveChatIdFromRequest(req);
   if (!chatId) {
-    return res
-      .status(401)
-      .json({ error: "Не авторизован. Войди через Telegram." });
+    return res.status(401).json({
+      error: "Не авторизован. Войдите через Telegram или Google.",
+    });
   }
 
   req.chatId = String(chatId);
@@ -700,9 +725,9 @@ app.get("/api/prompts", (req, res) => {
 app.get("/api/events", (req, res) => {
   const chatId = resolveChatIdFromRequest(req, { allowQuerySession: true });
   if (!chatId) {
-    return res
-      .status(401)
-      .json({ error: "Не авторизован. Войди через Telegram." });
+    return res.status(401).json({
+      error: "Не авторизован. Войдите через Telegram или Google.",
+    });
   }
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -764,6 +789,158 @@ app.get("/auth/telegram/callback", async (req, res) => {
   }
 });
 
+app.get("/auth/google/start", (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res
+      .status(503)
+      .type("text/plain")
+      .send(
+        "Google OAuth не настроен: задайте GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET на сервере."
+      );
+  }
+
+  const redirectUri = resolveGoogleRedirectUri(req);
+  if (!redirectUri) {
+    return res
+      .status(500)
+      .type("text/plain")
+      .send(
+        "Не удалось определить URL бэкенда. Задайте BACKEND_PUBLIC_URL или GOOGLE_REDIRECT_URI."
+      );
+  }
+
+  const state = crypto.randomBytes(24).toString("hex");
+  const isLocalHost =
+    req.hostname === "127.0.0.1" || req.hostname === "localhost";
+
+  const common = {
+    secure: isLocalHost ? false : COOKIE_SECURE,
+    sameSite: isLocalHost ? "Lax" : COOKIE_SAMESITE,
+    domain: COOKIE_DOMAIN,
+    maxAge: 600000,
+    path: "/",
+  };
+
+  res.cookie("google_oauth_state", state, { ...common, httpOnly: true });
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state,
+    access_type: "online",
+    prompt: "select_account",
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+app.get("/auth/google/callback", async (req, res) => {
+  const clearStateCookie = () => {
+    const isLocalHost =
+      req.hostname === "127.0.0.1" || req.hostname === "localhost";
+    const base = {
+      secure: isLocalHost ? false : COOKIE_SECURE,
+      sameSite: isLocalHost ? "Lax" : COOKIE_SAMESITE,
+      domain: COOKIE_DOMAIN,
+      path: "/",
+    };
+    res.clearCookie("google_oauth_state", base);
+  };
+
+  try {
+    if (req.query.error) {
+      clearStateCookie();
+      return res.redirect(
+        `${FRONTEND_ERROR_REDIRECT}&reason=${encodeURIComponent(
+          String(req.query.error)
+        )}`
+      );
+    }
+
+    const code = String(req.query.code || "").trim();
+    const state = String(req.query.state || "").trim();
+    const cookieState = String(req.cookies?.google_oauth_state || "").trim();
+
+    if (!code || !state || !cookieState || state !== cookieState) {
+      clearStateCookie();
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=oauth_state`);
+    }
+
+    clearStateCookie();
+
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=no_google_config`);
+    }
+
+    const redirectUri = resolveGoogleRedirectUri(req);
+    if (!redirectUri) {
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=no_redirect_uri`);
+    }
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    const tokenJson = await tokenRes.json().catch(() => ({}));
+    if (!tokenRes.ok || !tokenJson.access_token) {
+      console.error("google token error", tokenRes.status, tokenJson);
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=token_exchange`);
+    }
+
+    const userinfoRes = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+      }
+    );
+
+    const profile = await userinfoRes.json().catch(() => ({}));
+    const sub = String(profile.sub || "").trim();
+
+    if (!sub) {
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=no_sub`);
+    }
+
+    const chatId = `g${sub}`;
+
+    let user = await getUserByChatId(chatId);
+    if (!user && AUTO_CREATE_USER) {
+      user = await createUserIfMissing(chatId);
+    }
+
+    if (!user) {
+      return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=user_not_created`);
+    }
+
+    const picture = String(profile.picture || "").trim();
+    if (picture && supabase) {
+      const { error: photoErr } = await supabase
+        .from(SUPABASE_USERS_TABLE)
+        .update({ photo_url: picture })
+        .eq(SUPABASE_CHAT_ID_COLUMN, chatId);
+      if (photoErr) {
+        console.warn("google profile photo update", photoErr.message);
+      }
+    }
+
+    setChatCookies(req, res, chatId);
+    return res.redirect(buildSuccessRedirectUrl(chatId));
+  } catch (error) {
+    console.error("google callback error", error);
+    return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=server_error`);
+  }
+});
+
 app.get("/auth/me", requireChatId, async (req, res) => {
   try {
     let user = await getUserByChatId(req.chatId);
@@ -808,6 +985,7 @@ app.post("/auth/logout", (_req, res) => {
 
   res.clearCookie("chatid", base);
   res.clearCookie("tg_session", base);
+  res.clearCookie("google_oauth_state", base);
   res.json({ ok: true });
 });
 
