@@ -66,6 +66,7 @@ const SUPABASE_USERS_TABLE = normalizeEnv(
   process.env.SUPABASE_USERS_TABLE,
   "users"
 );
+/** Имя колонки идентификатора пользователя; значения всегда строки (Telegram / Google `g…`). */
 const SUPABASE_CHAT_ID_COLUMN = normalizeEnv(
   process.env.SUPABASE_CHAT_ID_COLUMN,
   "chat_id"
@@ -424,20 +425,27 @@ function mapPlanForFrontend(plan) {
   };
 }
 
+/**
+ * Разбор payload платежа: `${chatId}-${planId}`.
+ * И user id, и id тарифа в БД — строки (Telegram: цифры, Google: `g…`, тариф: число или uuid).
+ */
 function parseWebhookPayload(payloadValue) {
-  const parts = String(payloadValue || "").split("-");
-  const chatIdRaw = parts[0];
-  const paymentIdRaw = parts[parts.length - 1];
-  const chatId = Number(chatIdRaw);
-  const paymentId = Number(paymentIdRaw);
+  const raw = String(payloadValue || "").trim();
+  if (!raw) return null;
 
-  if (!Number.isFinite(chatId) || !Number.isFinite(paymentId)) {
+  const lastDash = raw.lastIndexOf("-");
+  if (lastDash <= 0) return null;
+
+  const chatId = raw.slice(0, lastDash).trim();
+  const planId = raw.slice(lastDash + 1).trim();
+
+  if (!chatId || !planId) {
     return null;
   }
 
   return {
-    chatId: String(chatId),
-    paymentId,
+    chatId,
+    planId,
   };
 }
 
@@ -1157,13 +1165,13 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.status(400).json({ error: "invalid payload format" });
     }
 
-    const { chatId, paymentId } = parsed;
+    const { chatId, planId } = parsed;
 
     if (status === "pending") {
       emitSseEvent(chatId, "payment_pending", {
         type: "payment_pending",
         status,
-        payment_id: paymentId,
+        plan_id: planId,
       });
       return res.json({ ok: true, pending: true, status });
     }
@@ -1172,7 +1180,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       emitSseEvent(chatId, "payment_failed", {
         type: "payment_failed",
         status,
-        payment_id: paymentId,
+        plan_id: planId,
       });
       return res.json({ ok: true, ignored: true, status });
     }
@@ -1181,7 +1189,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       emitSseEvent(chatId, "payment_failed", {
         type: "payment_failed",
         status: status || "unknown",
-        payment_id: paymentId,
+        plan_id: planId,
       });
       return res.json({ ok: true, ignored: true, status });
     }
@@ -1195,7 +1203,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       user?.[SUPABASE_VERSION_COLUMN]
     );
     const versionCfg = resolveVersionConfig(selectedVersion);
-    const plan = await getPricingPlanById(paymentId, versionCfg.pricesTable);
+    const plan = await getPricingPlanById(planId, versionCfg.pricesTable);
 
     if (!plan) {
       return res.status(404).json({ error: "pricing plan not found" });
@@ -1237,7 +1245,8 @@ app.post("/api/webhooks/platega", async (req, res) => {
       ok: true,
       chat_id: chatId,
       version: versionCfg.versionRuntime,
-      payment_id: paymentId,
+      plan_id: planId,
+      payment_id: planId,
       balance: nextBalance,
       total_sum: nextTotalSum,
     });
