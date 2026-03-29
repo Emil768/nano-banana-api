@@ -184,6 +184,18 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
 const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
 const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
 
+const KIE_API_KEY = normalizeEnv(process.env.KIE_API_KEY);
+const KIE_API_BASE = normalizeEnv(process.env.KIE_API_BASE, "https://api.kie.ai");
+const TMPFILES_UPLOAD_URL = normalizeEnv(
+  process.env.TMPFILES_UPLOAD_URL,
+  "https://tmpfiles.org/api/v1/upload"
+);
+
+/** @type {Map<string, { chatId: string, cost: number, versionRuntime: string, createdAt: number }>} */
+const videoJobMetaByTaskId = new Map();
+/** @type {Map<string, { videoUrl: string, balance: number }>} */
+const videoJobResultByTaskId = new Map();
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.warn(
     "SUPABASE_URL или SUPABASE_SERVICE_ROLE_KEY не задан. Проверка юзера отключится."
@@ -720,6 +732,145 @@ async function checkPromptWithOpenRouter(prompt) {
     shouldBlock: Boolean(parsed.shouldBlock),
     hasClearIntent: Boolean(parsed.hasClearIntent),
   };
+}
+
+function resolveVideoGenerationCost(sound, durationRaw) {
+  const duration = String(durationRaw) === "10" ? "10" : "5";
+  const withSound = Boolean(sound);
+  if (duration === "5" && !withSound) return 5;
+  if (duration === "10" && !withSound) return 10;
+  if (duration === "5" && withSound) return 10;
+  if (duration === "10" && withSound) return 20;
+  return 5;
+}
+
+/**
+ * Страница tmpfiles (HTML) -> URL прямой отдачи файла для image_urls (как в n8n).
+ * replace('http://tmpfiles.org/', 'http://tmpfiles.org/dl/') — иначе по «прямой» ссылке не то, что нужно API.
+ */
+function toTmpfilesDlUrl(pageUrl) {
+  let s = String(pageUrl || "").trim();
+  if (!s) return "";
+  if (/\/dl\//i.test(s)) return s;
+
+  s = s.replace(/^http:\/\/tmpfiles\.org\//i, "http://tmpfiles.org/dl/");
+  s = s.replace(/^https:\/\/tmpfiles\.org\//i, "https://tmpfiles.org/dl/");
+  s = s.replace(/^http:\/\/www\.tmpfiles\.org\//i, "http://www.tmpfiles.org/dl/");
+  s = s.replace(
+    /^https:\/\/www\.tmpfiles\.org\//i,
+    "https://www.tmpfiles.org/dl/"
+  );
+
+  try {
+    const u = new URL(s);
+    const host = u.hostname.replace(/^www\./i, "");
+    if (host !== "tmpfiles.org") return s;
+    if (u.pathname.startsWith("/dl/")) return s;
+    return `${u.origin}/dl${u.pathname}`;
+  } catch {
+    return s;
+  }
+}
+
+async function uploadBufferToTmpfiles(buffer, filename, mimeType) {
+  const form = new FormData();
+  const blob = new Blob([buffer], { type: mimeType || "image/jpeg" });
+  form.append("file", blob, filename || "ref.jpg");
+
+  const res = await fetch(TMPFILES_UPLOAD_URL, {
+    method: "POST",
+    body: form,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  const statusOk =
+    String(json?.status || "").toLowerCase() === "success" ||
+    json?.success === true ||
+    json?.ok === true;
+
+  const pageUrl =
+    json?.data?.url ||
+    json?.data?.URL ||
+    json?.url ||
+    json?.data?.file?.url ||
+    "";
+
+  if (!res.ok || !statusOk || !pageUrl) {
+    const msg =
+      typeof json?.message === "string"
+        ? json.message
+        : "Не удалось загрузить файл на tmpfiles.org";
+    return { ok: false, error: msg };
+  }
+
+  return { ok: true, pageUrl: String(pageUrl) };
+}
+
+function extractKieTaskId(payload) {
+  const inner = payload?.data ?? payload;
+  return String(inner?.taskId || inner?.task_id || payload?.taskId || "").trim();
+}
+
+function extractKieRecordInner(payload) {
+  return payload?.data ?? payload;
+}
+
+function extractVideoUrlFromKieRecord(record) {
+  const resultJsonStr = record?.resultJson ?? record?.result_json;
+  if (typeof resultJsonStr === "string" && resultJsonStr.trim()) {
+    try {
+      const parsed = JSON.parse(resultJsonStr);
+      const urls = parsed?.resultUrls || parsed?.result_urls;
+      if (Array.isArray(urls) && urls[0]) return String(urls[0]).trim();
+      if (typeof parsed?.url === "string") return parsed.url.trim();
+    } catch {
+      /* ignore */
+    }
+  }
+  return "";
+}
+
+function normalizeKieJobState(stateRaw) {
+  return String(stateRaw || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isKiePendingState(state) {
+  return ["waiting", "queuing", "queuning", "generating", "pending", "processing"].includes(
+    state
+  );
+}
+
+function isKieFailedState(state) {
+  return ["fail", "failed", "error"].includes(state);
+}
+
+function isKieSuccessState(state) {
+  return ["success", "succeeded", "completed"].includes(state);
+}
+
+async function kieFetchJson(pathname, init = {}) {
+  const base = KIE_API_BASE.replace(/\/$/, "");
+  const url = pathname.startsWith("http") ? pathname : `${base}${pathname}`;
+  const headers = new Headers(init.headers || {});
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${KIE_API_KEY}`);
+  }
+  const response = await fetch(url, { ...init, headers });
+  const raw = await response.json().catch(() => ({}));
+  return { response, raw };
+}
+
+function pruneVideoJobMaps() {
+  const maxAgeMs = 3 * 60 * 60 * 1000;
+  const now = Date.now();
+  for (const [id, meta] of videoJobMetaByTaskId) {
+    if (now - meta.createdAt > maxAgeMs) {
+      videoJobMetaByTaskId.delete(id);
+      videoJobResultByTaskId.delete(id);
+    }
+  }
 }
 
 app.get("/health", (_req, res) => {
@@ -1516,6 +1667,282 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
   }
 });
 
+app.post("/api/generate-video/start", requireChatId, async (req, res) => {
+  try {
+    if (!KIE_API_KEY) {
+      return res.status(500).json({ error: "KIE_API_KEY не настроен" });
+    }
+
+    let user = await getUserByChatId(req.chatId);
+    if (!user && AUTO_CREATE_USER) {
+      user = await createUserIfMissing(req.chatId);
+    }
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: "Пользователь не найден в Supabase" });
+    }
+
+    const requestedVersion = normalizeVersionRuntime(
+      req.body?.version || user?.[SUPABASE_VERSION_COLUMN]
+    );
+    const versionCfg = resolveVersionConfig(requestedVersion);
+    const rawBalance = Number(user?.[versionCfg.balanceColumn]);
+    const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
+
+    const sound = Boolean(req.body?.sound);
+    const duration = String(req.body?.duration) === "10" ? "10" : "5";
+    const cost = resolveVideoGenerationCost(sound, duration);
+
+    if (currentBalance < cost) {
+      return res.status(402).json({
+        error: "Недостаточно генераций. Пополните баланс.",
+        code: "INSUFFICIENT_BALANCE",
+        balance: currentBalance,
+        required: cost,
+      });
+    }
+
+    const promptText = extractPromptText(req.body);
+    if (promptText.trim()) {
+      const moderation = await checkPromptWithOpenRouter(promptText);
+      if (moderation.shouldBlock) {
+        return res.status(422).json({
+          error:
+            moderation.shortMessageRu ||
+            "Запрос содержит контент и не может быть отправлен в генерацию.",
+          code: "PROMPT_BLOCKED",
+        });
+      }
+    }
+
+    const imageBase64 = String(req.body?.imageBase64 || "").trim();
+    if (!imageBase64) {
+      return res.status(400).json({ error: "Нужно загрузить изображение." });
+    }
+
+    let buffer;
+    try {
+      buffer = Buffer.from(imageBase64, "base64");
+    } catch {
+      return res.status(400).json({ error: "Некорректное изображение." });
+    }
+
+    const maxBytes = 18 * 1024 * 1024;
+    if (!buffer.length || buffer.length > maxBytes) {
+      return res.status(413).json({ error: "Файл слишком большой." });
+    }
+
+    const mimeType = String(req.body?.mimeType || "image/jpeg").trim();
+    const ext =
+      mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+
+    const upload = await uploadBufferToTmpfiles(
+      buffer,
+      `ref.${ext}`,
+      mimeType
+    );
+
+    if (!upload.ok) {
+      return res.status(502).json({
+        error: upload.error || "Не удалось загрузить картинку.",
+        code: "TMPFILES_UPLOAD_FAILED",
+      });
+    }
+
+    const imageUrl = toTmpfilesDlUrl(upload.pageUrl);
+
+    const { response: kieRes, raw: kieRaw } = await kieFetchJson(
+      "/api/v1/jobs/createTask",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "kling-2.6/image-to-video",
+          input: {
+            prompt: promptText,
+            image_urls: [imageUrl],
+            sound,
+            duration,
+          },
+        }),
+      }
+    );
+
+    const taskId = extractKieTaskId(kieRaw);
+    const kieHttpOk = kieRes.ok;
+    const kieCodeOk = Number(kieRaw?.code) === 200;
+
+    if (!kieHttpOk || !kieCodeOk || !taskId) {
+      const msg =
+        typeof kieRaw?.msg === "string" && kieRaw.msg.trim()
+          ? kieRaw.msg
+          : "Не удалось создать задачу видео.";
+      return res.status(502).json({
+        error: msg,
+        code: "KIE_CREATE_FAILED",
+        raw: kieRaw,
+      });
+    }
+
+    pruneVideoJobMaps();
+    videoJobMetaByTaskId.set(taskId, {
+      chatId: String(req.chatId),
+      cost,
+      versionRuntime: versionCfg.versionRuntime,
+      createdAt: Date.now(),
+    });
+
+    return res.json({
+      taskId,
+      cost,
+      version: versionCfg.versionRuntime,
+    });
+  } catch (error) {
+    console.error("generate-video start error", error);
+    return res.status(500).json({ error: "Внутренняя ошибка сервера" });
+  }
+});
+
+app.get("/api/generate-video/status", requireChatId, async (req, res) => {
+  try {
+    if (!KIE_API_KEY) {
+      return res.status(500).json({ error: "KIE_API_KEY не настроен" });
+    }
+
+    const taskId = String(req.query?.taskId || "").trim();
+    if (!taskId) {
+      return res.status(400).json({ error: "Нужен taskId." });
+    }
+
+    const meta = videoJobMetaByTaskId.get(taskId);
+    if (!meta || meta.chatId !== String(req.chatId)) {
+      return res.status(404).json({ error: "Задача не найдена." });
+    }
+
+    if (videoJobResultByTaskId.has(taskId)) {
+      const cached = videoJobResultByTaskId.get(taskId);
+      return res.json({
+        state: "success",
+        videoUrl: cached.videoUrl,
+        balance: cached.balance,
+        charged: cached.cost,
+        cached: true,
+      });
+    }
+
+    const { response: kieRes, raw: kieRaw } = await kieFetchJson(
+      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
+      { method: "GET" }
+    );
+
+    const inner = extractKieRecordInner(kieRaw);
+    const state = normalizeKieJobState(inner?.state);
+
+    if (!kieRes.ok) {
+      return res.status(502).json({
+        error: typeof kieRaw?.msg === "string" ? kieRaw.msg : "Ошибка KIE API",
+        code: "KIE_STATUS_HTTP",
+      });
+    }
+
+    if (isKiePendingState(state)) {
+      return res.json({
+        state: "pending",
+        kieState: inner?.state || state,
+      });
+    }
+
+    if (isKieFailedState(state)) {
+      videoJobMetaByTaskId.delete(taskId);
+      return res.json({
+        state: "failed",
+        error:
+          String(inner?.failMsg || inner?.fail_msg || "").trim() ||
+          "Генерация видео не удалась.",
+        failCode: inner?.failCode || inner?.fail_code || "",
+      });
+    }
+
+    if (!isKieSuccessState(state)) {
+      return res.json({
+        state: "pending",
+        kieState: inner?.state || state,
+      });
+    }
+
+    const videoUrl = extractVideoUrlFromKieRecord(inner);
+    if (!videoUrl) {
+      return res.status(502).json({
+        error: "Сервис не вернул ссылку на видео.",
+        code: "KIE_NO_VIDEO_URL",
+      });
+    }
+
+    let user = await getUserByChatId(req.chatId);
+    if (!user && AUTO_CREATE_USER) {
+      user = await createUserIfMissing(req.chatId);
+    }
+    if (!user) {
+      return res.status(401).json({ error: "Пользователь не найден." });
+    }
+
+    const versionCfg = resolveVersionConfig(meta.versionRuntime);
+    const rawBalance = Number(user?.[versionCfg.balanceColumn]);
+    const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
+
+    if (currentBalance < meta.cost) {
+      return res.status(402).json({
+        error: "Недостаточно генераций на момент завершения.",
+        code: "INSUFFICIENT_BALANCE",
+        balance: currentBalance,
+        required: meta.cost,
+      });
+    }
+
+    let nextBalance = currentBalance;
+    if (supabase) {
+      nextBalance = Math.max(0, currentBalance - meta.cost);
+      const { error: updateError } = await supabase
+        .from(SUPABASE_USERS_TABLE)
+        .update({
+          [versionCfg.balanceColumn]: nextBalance,
+          [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage,
+        })
+        .eq(SUPABASE_CHAT_ID_COLUMN, req.chatId);
+
+      if (updateError) {
+        console.error("video balance update error", updateError);
+        nextBalance = currentBalance;
+      }
+    }
+
+    emitSseEvent(req.chatId, "balance_update", {
+      type: "balance_update",
+      version: versionCfg.versionRuntime,
+      balance: nextBalance,
+    });
+
+    videoJobResultByTaskId.set(taskId, {
+      videoUrl,
+      balance: nextBalance,
+      cost: meta.cost,
+    });
+    videoJobMetaByTaskId.delete(taskId);
+
+    return res.json({
+      state: "success",
+      videoUrl,
+      balance: nextBalance,
+      charged: meta.cost,
+    });
+  } catch (error) {
+    console.error("generate-video status error", error);
+    return res.status(500).json({ error: "Внутренняя ошибка сервера" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(
     `Config: table=${SUPABASE_USERS_TABLE}, chatColumn=${SUPABASE_CHAT_ID_COLUMN}, versionColumn=${SUPABASE_VERSION_COLUMN}, pricesTable=${SUPABASE_PRICES_TABLE}, pricesFreeTable=${SUPABASE_PRICES_FREE_TABLE}, origins=${ALLOWED_ORIGINS.join(
@@ -1533,6 +1960,10 @@ app.listen(PORT, () => {
     `Prompt filter: model=${OPENROUTER_MODEL}, openrouterKey=${
       OPENROUTER_API_KEY ? "set" : "missing"
     }`
+  );
+
+  console.log(
+    `KIE video: apiKey=${KIE_API_KEY ? "set" : "missing"}, base=${KIE_API_BASE}`
   );
 
   console.log(`Backend started on port ${PORT}`);
