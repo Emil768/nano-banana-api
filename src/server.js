@@ -1705,17 +1705,6 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     }
 
     const promptText = extractPromptText(req.body);
-    if (promptText.trim()) {
-      const moderation = await checkPromptWithOpenRouter(promptText);
-      if (moderation.shouldBlock) {
-        return res.status(422).json({
-          error:
-            moderation.shortMessageRu ||
-            "Запрос содержит контент и не может быть отправлен в генерацию.",
-          code: "PROMPT_BLOCKED",
-        });
-      }
-    }
 
     const imageBase64 = String(req.body?.imageBase64 || "").trim();
     if (!imageBase64) {
