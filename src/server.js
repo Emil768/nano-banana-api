@@ -687,7 +687,7 @@ async function checkPromptWithOpenRouter(prompt) {
             {"shouldBlock":false,"hasClearIntent":true}
 
           Правила:
-          - shouldBlock=true, ТОЛЬКО: обнажёнка, кровь.
+          - shouldBlock=true, ТОЛЬКО: обнажёнка.
           - hasClearIntent=false, если это бессмысленный набор символов, случайные буквы.
           - Короткие, но понятные запросы (например "кот в шляпе") считаются нормальными.
           - Ничего кроме JSON не пиши.`,
