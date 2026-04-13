@@ -137,11 +137,11 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
 ).toLowerCase();
 
 const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
-const LAOZHANG_HOSTS = [
-  normalizeLaozhangHost(process.env.LAOZHANG_URL_1),
-  normalizeLaozhangHost(process.env.LAOZHANG_URL_2),
-  normalizeLaozhangHost(process.env.LAOZHANG_URL_3),
-].filter(Boolean);
+
+const LAOZHANG_URL_ENTERPRISE = normalizeEnv(process.env.LAOZHANG_URL_ENTERPRISE);
+const LAOZHANG_API_KEY_ENTERPRISE = normalizeEnv(
+  process.env.LAOZHANG_API_KEY_ENTERPRISE
+);
 
 const PAYMENT_PROVIDER_URL =
   normalizeEnv(process.env.PAYMENT_PROVIDER_URL) ||
@@ -495,20 +495,35 @@ function buildLaozhangUpstreamCandidates(upstreamPath) {
   return [`https://${LAOZHANG_PRIMARY_HOST}${upstreamPath}`];
 }
 
-function buildLaozhangRequest(url) {
+function buildLaozhangRequest(url, options = {}) {
+  const apiKey = options.apiKey ?? LAOZHANG_API_KEY;
+  const authMode = (
+    options.authMode ?? LAOZHANG_AUTH_MODE
+  ).toLowerCase();
   const headers = { "Content-Type": "application/json" };
   let requestUrl = url;
 
-  if (LAOZHANG_AUTH_MODE === "query") {
+  if (authMode === "query") {
     const glue = requestUrl.includes("?") ? "&" : "?";
-    requestUrl = `${requestUrl}${glue}key=${encodeURIComponent(
-      LAOZHANG_API_KEY
-    )}`;
+    requestUrl = `${requestUrl}${glue}key=${encodeURIComponent(apiKey)}`;
   } else {
-    headers.Authorization = `Bearer ${LAOZHANG_API_KEY}`;
+    headers.Authorization = `Bearer ${apiKey}`;
   }
 
   return { requestUrl, headers };
+}
+
+/** Fallback: полный URL из LAOZHANG_URL_ENTERPRISE или путь + хост LAOZHANG_URL_1 */
+function resolveLaozhangEnterpriseUrl() {
+  if (!LAOZHANG_URL_ENTERPRISE || !LAOZHANG_API_KEY_ENTERPRISE) return null;
+  const raw = LAOZHANG_URL_ENTERPRISE;
+  if (/^https?:\/\//i.test(raw)) {
+    return raw.replace("/v1/beta/", "/v1beta/");
+  }
+  if (!LAOZHANG_PRIMARY_HOST) return null;
+  const path = normalizeLaozhangPath(raw);
+  if (!path) return null;
+  return `https://${LAOZHANG_PRIMARY_HOST}${path}`;
 }
 
 function parseJsonOrRaw(rawText) {
@@ -1566,6 +1581,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     };
 
     const candidateUrl = upstreamCandidates[0];
+    const enterpriseCandidateUrl = resolveLaozhangEnterpriseUrl();
 
     let lastError = {
       index: 1,
@@ -1573,8 +1589,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       message: "Ошибка сервиса",
     };
 
-    try {
-      const { requestUrl, headers } = buildLaozhangRequest(candidateUrl);
+    const attemptUpstream = async (url, apiKey, attemptIndex) => {
+      const { requestUrl, headers } = buildLaozhangRequest(url, {
+        apiKey,
+      });
 
       const upstreamResponse = await fetch(requestUrl, {
         method: "POST",
@@ -1586,35 +1604,59 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
       if (!upstreamResponse.ok) {
         lastError = {
-          index: 1,
+          index: attemptIndex,
           status: upstreamResponse.status,
           message: normalizeUpstreamErrorMessage(raw?.error || raw),
         };
-      } else {
-        const extractedImages = extractImagesFromRaw(raw);
-
-        if (!extractedImages.length) {
-          lastError = {
-            index: 1,
-            status: 502,
-            message: "Сервис вернул ответ без изображения",
-          };
-        } else {
-          for (const item of extractedImages) {
-            generatedImages.push({
-              imageData: item.imageData,
-              mimeType: item.mimeType,
-              raw,
-            });
-          }
-        }
+        return false;
       }
-    } catch (error) {
-      lastError = {
-        index: 1,
-        status: 503,
-        message: error?.message || "Ошибка сервиса",
-      };
+
+      const extractedImages = extractImagesFromRaw(raw);
+
+      if (!extractedImages.length) {
+        lastError = {
+          index: attemptIndex,
+          status: 502,
+          message: "Сервис вернул ответ без изображения",
+        };
+        return false;
+      }
+
+      for (const item of extractedImages) {
+        generatedImages.push({
+          imageData: item.imageData,
+          mimeType: item.mimeType,
+          raw,
+        });
+      }
+      return true;
+    };
+
+    const runLaozhangAttempt = async (url, apiKey, attemptIndex) => {
+      try {
+        return await attemptUpstream(url, apiKey, attemptIndex);
+      } catch (error) {
+        lastError = {
+          index: attemptIndex,
+          status: 503,
+          message: error?.message || "Ошибка сервиса",
+        };
+        return false;
+      }
+    };
+
+    const primaryOk = await runLaozhangAttempt(
+      candidateUrl,
+      LAOZHANG_API_KEY,
+      1
+    );
+
+    if (!primaryOk && enterpriseCandidateUrl) {
+      await runLaozhangAttempt(
+        enterpriseCandidateUrl,
+        LAOZHANG_API_KEY_ENTERPRISE,
+        2
+      );
     }
 
     if (!generatedImages.length) {
