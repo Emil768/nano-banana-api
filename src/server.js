@@ -1694,7 +1694,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         data: item.imageData,
         mimeType: item.mimeType || "image/png",
       })),
-      raw: generatedImages[0].raw,
       balance: nextBalance,
       charged: chargedCount,
       requested: requestedCount,
