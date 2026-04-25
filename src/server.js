@@ -39,6 +39,8 @@ const FRONTEND_ERROR_REDIRECT =
   normalizeEnv(process.env.FRONTEND_ERROR_REDIRECT) ||
   `${FRONTEND_ORIGIN}/generate.html?auth_error=1`;
 
+const POST_AUTH_REDIRECT_COOKIE = "post_auth_redirect";
+
 const TELEGRAM_BOT_TOKEN = normalizeEnv(process.env.TELEGRAM_BOT_TOKEN);
 const TELEGRAM_WIDGET_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_WIDGET_MAX_AGE_SECONDS || 300
@@ -349,19 +351,58 @@ function verifySessionToken(tokenValue) {
 }
 
 function buildSuccessRedirectUrl(chatId) {
+  return buildSuccessRedirectUrlWithOverride(chatId, null);
+}
+
+function normalizeFrontendRedirectTarget(value) {
+  const raw = normalizeEnv(value);
+  if (!raw) return null;
+
+  // Allow relative redirects like "/"
+  if (raw.startsWith("/")) {
+    return raw;
+  }
+
+  // Allow only URLs under FRONTEND_ORIGIN
+  try {
+    const origin = new URL(FRONTEND_ORIGIN);
+    const target = new URL(raw);
+    if (target.origin !== origin.origin) return null;
+    return target.pathname + target.search + target.hash;
+  } catch {
+    return null;
+  }
+}
+
+function buildSuccessRedirectUrlWithOverride(chatId, redirectOverride) {
   const token = createSessionToken(chatId);
-  if (!token) return FRONTEND_SUCCESS_REDIRECT;
+  const baseRedirect = normalizeFrontendRedirectTarget(redirectOverride)
+    ? new URL(normalizeFrontendRedirectTarget(redirectOverride), FRONTEND_ORIGIN)
+        .toString()
+    : FRONTEND_SUCCESS_REDIRECT;
+
+  if (!token) return baseRedirect;
 
   try {
-    const target = new URL(FRONTEND_SUCCESS_REDIRECT);
+    const target = new URL(baseRedirect);
     target.searchParams.set("session", token);
     return target.toString();
   } catch {
-    const glue = FRONTEND_SUCCESS_REDIRECT.includes("?") ? "&" : "?";
-    return `${FRONTEND_SUCCESS_REDIRECT}${glue}session=${encodeURIComponent(
+    const glue = baseRedirect.includes("?") ? "&" : "?";
+    return `${baseRedirect}${glue}session=${encodeURIComponent(
       token
     )}`;
   }
+}
+
+function resolvePostAuthRedirect(req) {
+  const fromQuery = normalizeFrontendRedirectTarget(req.query?.redirect);
+  if (fromQuery) return fromQuery;
+
+  const fromCookie = normalizeFrontendRedirectTarget(req.cookies?.[POST_AUTH_REDIRECT_COOKIE]);
+  if (fromCookie) return fromCookie;
+
+  return null;
 }
 
 async function getUserByChatId(chatId) {
@@ -636,6 +677,27 @@ function extractPromptText(body = {}) {
   ].filter((value) => typeof value === "string" && value.trim());
 
   return directCandidates[0] || "";
+}
+
+function extractInlineImagesFromRequestBody(body = {}) {
+  const parts = Array.isArray(body?.contents?.[0]?.parts)
+    ? body.contents[0].parts
+    : [];
+
+  /** @type {{ mimeType: string, data: string }[]} */
+  const images = [];
+
+  parts.forEach((part) => {
+    const inline = part?.inline_data || part?.inlineData;
+    const data = typeof inline?.data === "string" ? inline.data.trim() : "";
+    if (!data) return;
+    images.push({
+      mimeType: String(inline?.mime_type || inline?.mimeType || "image/jpeg"),
+      data,
+    });
+  });
+
+  return images;
 }
 
 async function checkPromptWithOpenRouter(prompt) {
@@ -956,7 +1018,8 @@ app.get("/auth/telegram/callback", async (req, res) => {
     }
 
     setChatCookies(req, res, chatId);
-    return res.redirect(buildSuccessRedirectUrl(chatId));
+    const redirectTarget = resolvePostAuthRedirect(req);
+    return res.redirect(buildSuccessRedirectUrlWithOverride(chatId, redirectTarget));
   } catch (error) {
     console.error("telegram callback error", error);
     return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=server_error`);
@@ -996,6 +1059,14 @@ app.get("/auth/google/start", (req, res) => {
   };
 
   res.cookie("google_oauth_state", state, { ...common, httpOnly: true });
+
+  const redirectTarget = resolvePostAuthRedirect(req);
+  if (redirectTarget) {
+    res.cookie(POST_AUTH_REDIRECT_COOKIE, redirectTarget, {
+      ...common,
+      httpOnly: true,
+    });
+  }
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
@@ -1112,7 +1183,14 @@ app.get("/auth/google/callback", async (req, res) => {
     }
 
     setChatCookies(req, res, chatId);
-    return res.redirect(buildSuccessRedirectUrl(chatId));
+    const redirectTarget = resolvePostAuthRedirect(req);
+    res.clearCookie(POST_AUTH_REDIRECT_COOKIE, {
+      secure: COOKIE_SECURE,
+      sameSite: COOKIE_SAMESITE,
+      domain: COOKIE_DOMAIN,
+      path: "/",
+    });
+    return res.redirect(buildSuccessRedirectUrlWithOverride(chatId, redirectTarget));
   } catch (_error) {
     return res.redirect(`${FRONTEND_ERROR_REDIRECT}&reason=server_error`);
   }
@@ -1501,67 +1579,76 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
 
-    if (upstreamPayloadBase?.generationConfig?.imageConfig) {
-      const imageCfg = upstreamPayloadBase.generationConfig.imageConfig;
-      if (
-        typeof imageCfg.aspectRatio === "string" &&
-        !imageCfg.aspectRatio.trim()
-      ) {
-        delete imageCfg.aspectRatio;
-      }
-    }
+    const inlineImages = extractInlineImagesFromRequestBody(upstreamPayloadBase);
 
-    const extractImagesFromRaw = (rawData) => {
-      const normalizeImageString = (value, fallbackMime = "image/png") => {
-        if (typeof value !== "string" || !value.trim()) return null;
-
-        const trimmed = value.trim();
-        const dataUrlMatch = trimmed.match(/^data:(.+?);base64,(.+)$/i);
-
-        if (dataUrlMatch) {
-          return {
-            imageData: dataUrlMatch[2],
-            mimeType: dataUrlMatch[1] || fallbackMime,
-          };
-        }
-
-        return {
-          imageData: trimmed,
-          mimeType: fallbackMime,
-        };
+    const buildOpenAiStyleJsonBody = () => {
+      const prompt = extractPromptText(upstreamPayloadBase);
+      const body = {
+        model: "gpt-image-2",
+        prompt,
+        n: Math.max(1, requestedCount),
+        response_format: "b64_json",
       };
 
+      return body;
+    };
+
+    const toBlobFromBase64 = (base64, mimeType) => {
+      const clean = String(base64 || "").trim().replace(/^data:.*?;base64,/i, "");
+      const buffer = Buffer.from(clean, "base64");
+      return new Blob([buffer], { type: mimeType || "image/jpeg" });
+    };
+
+    const downloadImageAsBase64 = async (url) => {
+      const r = await fetch(url);
+      if (!r.ok) {
+        throw new Error(`Не удалось скачать изображение: ${r.status}`);
+      }
+      const mimeType =
+        String(r.headers.get("content-type") || "").trim() || "image/png";
+      const ab = await r.arrayBuffer();
+      const b64 = Buffer.from(ab).toString("base64");
+      return { imageData: b64, mimeType };
+    };
+
+    const extractImagesFromRaw = async (rawData) => {
+      /** @type {{ imageData: string, mimeType: string }[]} */
+      const out = [];
+
+      // OpenAI Images API shape: { data: [{ b64_json | url }] }
+      const dataArr = Array.isArray(rawData?.data) ? rawData.data : [];
+      for (const item of dataArr) {
+        if (typeof item?.b64_json === "string" && item.b64_json.trim()) {
+          out.push({ imageData: item.b64_json.trim(), mimeType: "image/png" });
+          continue;
+        }
+        if (typeof item?.url === "string" && item.url.trim()) {
+          out.push(await downloadImageAsBase64(item.url.trim()));
+        }
+      }
+
+      if (out.length) return out;
+
+      // Back-compat: previously handled Gemini-like inline_data.
       const parts =
         rawData?.candidates?.[0]?.content?.parts ||
         rawData?.data?.candidates?.[0]?.content?.parts ||
         [];
 
-      const inlineImages = parts
-        .map((part) => {
-          const inline = part?.inline_data || part?.inlineData;
-          if (typeof inline?.data !== "string") return null;
-          return {
-            imageData: inline.data,
-            mimeType: inline?.mime_type || inline?.mimeType || "image/png",
-          };
-        })
-        .filter(Boolean);
+      const inline = Array.isArray(parts)
+        ? parts
+            .map((part) => {
+              const inner = part?.inline_data || part?.inlineData;
+              if (typeof inner?.data !== "string") return null;
+              return {
+                imageData: String(inner.data).trim(),
+                mimeType: String(inner?.mime_type || inner?.mimeType || "image/png"),
+              };
+            })
+            .filter(Boolean)
+        : [];
 
-      if (inlineImages.length) return inlineImages;
-
-      const simpleCandidates = [
-        normalizeImageString(rawData?.imageData, "image/png"),
-        normalizeImageString(rawData?.image, "image/png"),
-        normalizeImageString(rawData?.data?.[0]?.b64_json, "image/png"),
-        normalizeImageString(rawData?.output?.[0]?.b64_json, "image/png"),
-        normalizeImageString(
-          rawData?.predictions?.[0]?.bytesBase64Encoded,
-          "image/png"
-        ),
-      ].filter(Boolean);
-
-      if (simpleCandidates.length) return simpleCandidates;
-      return [];
+      return inline;
     };
 
     const generatedImages = [];
@@ -1576,10 +1663,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return "Ошибка сервиса";
     };
 
-    const upstreamPayload = {
-      ...upstreamPayloadBase,
-    };
-
     const candidateUrl = upstreamCandidates[0];
     const enterpriseCandidateUrl = resolveLaozhangEnterpriseUrl();
 
@@ -1590,15 +1673,47 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     };
 
     const attemptUpstream = async (url, apiKey, attemptIndex) => {
-      const { requestUrl, headers } = buildLaozhangRequest(url, {
+      const prompt = extractPromptText(upstreamPayloadBase);
+
+      const useEdits = inlineImages.length > 0;
+      const endpointUrl = url;
+      const { requestUrl, headers } = buildLaozhangRequest(endpointUrl, {
         apiKey,
       });
 
-      const upstreamResponse = await fetch(requestUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(upstreamPayload),
-      });
+      let upstreamResponse;
+
+      if (!useEdits) {
+        const jsonBody = buildOpenAiStyleJsonBody();
+        upstreamResponse = await fetch(requestUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(jsonBody),
+        });
+      } else {
+        // Images edits: send first inline image as source (multipart).
+        const form = new FormData();
+        form.append("model", "gpt-image-2");
+        form.append(
+          "prompt",
+          prompt ||
+            "Use the provided image as the source. Preserve subject and composition."
+        );
+
+        const first = inlineImages[0];
+        const blob = toBlobFromBase64(first.data, first.mimeType);
+        const ext = (first.mimeType || "").includes("png") ? "png" : "jpg";
+        form.append("image", blob, `source.${ext}`);
+
+        const multipartHeaders = new Headers();
+        if (headers.Authorization) multipartHeaders.set("Authorization", headers.Authorization);
+
+        upstreamResponse = await fetch(requestUrl.replace(/\/images\/generations\b/i, "/images/edits"), {
+          method: "POST",
+          headers: multipartHeaders,
+          body: form,
+        });
+      }
 
       const raw = await upstreamResponse.json().catch(() => ({}));
 
@@ -1611,7 +1726,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         return false;
       }
 
-      const extractedImages = extractImagesFromRaw(raw);
+      const extractedImages = await extractImagesFromRaw(raw);
 
       if (!extractedImages.length) {
         lastError = {
