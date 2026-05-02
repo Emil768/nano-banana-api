@@ -679,6 +679,19 @@ function extractInlineImagesFromRequestBody(body = {}) {
   }
   if (images.length) return images;
 
+  /** Одно фото как у бота / multipart-форм: `{ image: { data, mimeType } }`. */
+  const one = body?.image;
+  if (one && typeof one === "object" && !Array.isArray(one)) {
+    const data = typeof one.data === "string" ? one.data.trim() : "";
+    if (data) {
+      images.push({
+        mimeType: String(one.mimeType || one.mime_type || "image/jpeg"),
+        data,
+      });
+      return images;
+    }
+  }
+
   const parts = Array.isArray(body?.contents?.[0]?.parts)
     ? body.contents[0].parts
     : [];
@@ -1403,7 +1416,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     const requestedVersion = normalizeVersionRuntime(
-      req.body?.version || user?.[SUPABASE_VERSION_COLUMN]
+      user?.[SUPABASE_VERSION_COLUMN]
     );
     const versionCfg = resolveVersionConfig(requestedVersion);
     const rawBalance = Number(user?.[versionCfg.balanceColumn]);
@@ -1441,7 +1454,22 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
 
+    const rawImagesInBody = Array.isArray(req.body?.images)
+      ? req.body.images
+      : [];
+    const hasImageObject =
+      req.body?.image != null && typeof req.body.image === "object";
     const inlineImages = extractInlineImagesFromRequestBody(upstreamPayloadBase);
+    if (
+      (rawImagesInBody.length > 0 || hasImageObject) &&
+      inlineImages.length === 0
+    ) {
+      return res.status(422).json({
+        error:
+          "Нужен base64 в images[].data или в image.data, не только mimeType. Прикрепите файл заново.",
+        code: "MISSING_IMAGE_DATA",
+      });
+    }
 
     const buildOpenAiStyleJsonBody = () => {
       const prompt = extractPromptText(upstreamPayloadBase);
@@ -1527,6 +1555,15 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     const candidateUrl = upstreamCandidates[0];
 
+    const laozhangSocketRetries = Math.max(
+      0,
+      Math.min(3, Number(process.env.LAOZHANG_SOCKET_RETRIES || 1))
+    );
+    const laozhangSocketRetryDelayMs = Math.max(
+      500,
+      Number(process.env.LAOZHANG_SOCKET_RETRY_DELAY_MS || 2500)
+    );
+
     let lastError = {
       index: 1,
       status: 502,
@@ -1552,17 +1589,21 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           : 180_000;
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
+      const fetchUrl = useEdits
+        ? requestUrl.replace(/\/images\/generations\b/i, "/images/edits")
+        : requestUrl;
+
       try {
         if (!useEdits) {
           const jsonBody = buildOpenAiStyleJsonBody();
-          upstreamResponse = await fetch(requestUrl, {
+          upstreamResponse = await fetch(fetchUrl, {
             method: "POST",
             signal: controller.signal,
             headers,
             body: JSON.stringify(jsonBody),
           });
         } else {
-          // Images edits: send first inline image as source (multipart).
+          // Images edits: multipart — model, prompt, image (@file).
           const form = new FormData();
           form.append("model", LAOZHANG_IMAGE_MODEL);
           form.append(
@@ -1571,24 +1612,26 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
               "Use the provided image as the source. Preserve subject and composition."
           );
 
-          const first = inlineImages[0];
-          const blob = toBlobFromBase64(first.data, first.mimeType);
-          const ext = (first.mimeType || "").includes("png") ? "png" : "jpg";
-          form.append("image", blob, `source.${ext}`);
+          inlineImages.forEach((item, index) => {
+            const blob = toBlobFromBase64(item.data, item.mimeType);
+            const ext = (item.mimeType || "").includes("png") ? "png" : "jpg";
+            form.append(
+              "image",
+              blob,
+              index === 0 ? `source.${ext}` : `source${index}.${ext}`
+            );
+          });
 
           const multipartHeaders = new Headers();
           if (headers.Authorization)
             multipartHeaders.set("Authorization", headers.Authorization);
 
-          upstreamResponse = await fetch(
-            requestUrl.replace(/\/images\/generations\b/i, "/images/edits"),
-            {
-              method: "POST",
-              signal: controller.signal,
-              headers: multipartHeaders,
-              body: form,
-            }
-          );
+          upstreamResponse = await fetch(fetchUrl, {
+            method: "POST",
+            signal: controller.signal,
+            headers: multipartHeaders,
+            body: form,
+          });
         }
       } finally {
         clearTimeout(timeout);
@@ -1602,7 +1645,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           status: upstreamResponse.status,
           elapsed_ms: Date.now() - startedAt,
           useEdits,
-          requestUrl,
+          requestUrl: fetchUrl,
           body_preview: JSON.stringify(raw || {}).slice(0, 900),
         });
         lastError = {
@@ -1635,42 +1678,81 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     };
 
     const runLaozhangAttempt = async (url, apiKey, attemptIndex) => {
-      const startedAt = Date.now();
-      try {
-        return await attemptUpstream(url, apiKey, attemptIndex);
-      } catch (error) {
-        const cause = error?.cause;
-        console.error("Laozhang upstream fetch exception.", {
-          attempt: attemptIndex,
-          elapsed_ms: Date.now() - startedAt,
-          message: String(error?.message || error || "unknown error"),
-          name: error?.name || "",
-          code: error?.code || cause?.code || "",
-          errno: error?.errno || cause?.errno || "",
-          syscall: error?.syscall || cause?.syscall || "",
-          cause: cause
-            ? {
-                name: cause?.name,
-                message: String(cause?.message || ""),
-                code: cause?.code,
-              }
-            : null,
-          url,
-        });
+      const effectiveUrlForLog =
+        inlineImages.length > 0
+          ? String(url).replace(/\/images\/generations\b/i, "/images/edits")
+          : String(url);
 
-        const isAbort = error?.name === "AbortError";
-        lastError = {
-          index: attemptIndex,
-          status: isAbort ? 504 : 503,
-          message:
-            error?.message ||
-            (isAbort ? "timeout" : "Ошибка сервиса"),
-        };
-        return false;
+      const maxSocketAttempts = 1 + laozhangSocketRetries;
+
+      for (let socketTry = 0; socketTry < maxSocketAttempts; socketTry++) {
+        const startedAt = Date.now();
+        if (socketTry > 0) {
+          await new Promise((r) =>
+            setTimeout(r, laozhangSocketRetryDelayMs)
+          );
+          console.warn("Laozhang socket retry after transient failure.", {
+            attempt: attemptIndex,
+            socketTry: socketTry + 1,
+            url: effectiveUrlForLog,
+          });
+        }
+
+        try {
+          const ok = await attemptUpstream(url, apiKey, attemptIndex);
+          if (ok) return true;
+          return false;
+        } catch (error) {
+          const cause = error?.cause;
+          const netCode = error?.code || cause?.code || "";
+          const causeMsg = String(cause?.message || "");
+          const transient =
+            netCode === "EPIPE" ||
+            netCode === "UND_ERR_SOCKET" ||
+            /other side closed|ECONNRESET|ETIMEDOUT/i.test(causeMsg);
+
+          console.error("Laozhang upstream fetch exception.", {
+            attempt: attemptIndex,
+            socketTry: socketTry + 1,
+            elapsed_ms: Date.now() - startedAt,
+            message: String(error?.message || error || "unknown error"),
+            name: error?.name || "",
+            code: netCode,
+            errno: error?.errno || cause?.errno || "",
+            syscall: error?.syscall || cause?.syscall || "",
+            cause: cause
+              ? {
+                  name: cause?.name,
+                  message: causeMsg,
+                  code: cause?.code,
+                }
+              : null,
+            url: effectiveUrlForLog,
+            hint:
+              netCode === "EPIPE" || netCode === "UND_ERR_SOCKET"
+                ? "Соединение с API оборвалось во время запроса (сеть, таймаут или обрыв на стороне upstream)."
+                : undefined,
+          });
+
+          const isAbort = error?.name === "AbortError";
+          lastError = {
+            index: attemptIndex,
+            status: isAbort ? 504 : 503,
+            message:
+              error?.message ||
+              (isAbort ? "timeout" : "Ошибка сервиса"),
+          };
+
+          if (transient && !isAbort && socketTry < maxSocketAttempts - 1) {
+            continue;
+          }
+          return false;
+        }
       }
+
+      return false;
     };
 
-    // Одна попытка к основному URL — повтор на том же эндпоинте не делаем (лишнее ожидание).
     await runLaozhangAttempt(
       candidateUrl,
       LAOZHANG_API_KEY,
@@ -1679,8 +1761,26 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     if (!generatedImages.length) {
       generationErrors.push(lastError);
+      const msg = String(lastError?.message || "");
+      const safetyRejected =
+        /safety|rejected by the|content policy|moderation|not allowed/i.test(
+          msg
+        );
+      if (safetyRejected) {
+        return res.status(422).json({
+          error:
+            "Запрос отклонён модерацией провайдера. Смените формулировку или другое фото.",
+          code: "GENERATION_SAFETY",
+          details: generationErrors,
+        });
+      }
+      const socketLikeFailure =
+        Number(lastError?.status) === 503 &&
+        /fetch failed|socket|timeout/i.test(msg);
       return res.status(502).json({
-        error: "Ошибка генерации, попробуйте еще раз через 10 секунд",
+        error: socketLikeFailure
+          ? "Соединение с сервисом генерации оборвалось (часто на запросах с фото). Повторите через несколько секунд."
+          : "Ошибка генерации, попробуйте еще раз через 10 секунд",
         code: "GENERATION_FAILED_ALL",
         details: generationErrors,
       });
@@ -1718,7 +1818,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       partial: generatedImages.length < requestedCount,
       failed: Math.max(0, requestedCount - generatedImages.length),
       errors: generationErrors,
-      version: versionCfg.versionRuntime,
     });
   } catch (error) {
     console.error("generate error", error);
@@ -1744,7 +1843,7 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     }
 
     const requestedVersion = normalizeVersionRuntime(
-      req.body?.version || user?.[SUPABASE_VERSION_COLUMN]
+      user?.[SUPABASE_VERSION_COLUMN]
     );
     const versionCfg = resolveVersionConfig(requestedVersion);
     const rawBalance = Number(user?.[versionCfg.balanceColumn]);
@@ -1845,7 +1944,6 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     return res.json({
       taskId,
       cost,
-      version: versionCfg.versionRuntime,
     });
   } catch (error) {
     console.error("generate-video start error", error);
