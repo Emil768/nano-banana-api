@@ -140,9 +140,10 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
 
 const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
 
-const LAOZHANG_URL_ENTERPRISE = normalizeEnv(process.env.LAOZHANG_URL_ENTERPRISE);
-const LAOZHANG_API_KEY_ENTERPRISE = normalizeEnv(
-  process.env.LAOZHANG_API_KEY_ENTERPRISE
+/** Как в Laozhang Images API: `gpt-image-2-vip` или переопределение через env. */
+const LAOZHANG_IMAGE_MODEL = normalizeEnv(
+  process.env.LAOZHANG_IMAGE_MODEL,
+  "gpt-image-2-vip"
 );
 
 const PAYMENT_PROVIDER_URL =
@@ -182,9 +183,6 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
   process.env.PAYMENT_WEBHOOK_SECRET_HEADER,
   "x-webhook-secret"
 );
-
-const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
-const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
 
 const KIE_API_KEY = normalizeEnv(process.env.KIE_API_KEY);
 const KIE_API_BASE = normalizeEnv(process.env.KIE_API_BASE, "https://api.kie.ai");
@@ -554,19 +552,6 @@ function buildLaozhangRequest(url, options = {}) {
   return { requestUrl, headers };
 }
 
-/** Fallback: полный URL из LAOZHANG_URL_ENTERPRISE или путь + хост LAOZHANG_URL_1 */
-function resolveLaozhangEnterpriseUrl() {
-  if (!LAOZHANG_URL_ENTERPRISE || !LAOZHANG_API_KEY_ENTERPRISE) return null;
-  const raw = LAOZHANG_URL_ENTERPRISE;
-  if (/^https?:\/\//i.test(raw)) {
-    return raw.replace("/v1/beta/", "/v1beta/");
-  }
-  if (!LAOZHANG_PRIMARY_HOST) return null;
-  const path = normalizeLaozhangPath(raw);
-  if (!path) return null;
-  return `https://${LAOZHANG_PRIMARY_HOST}${path}`;
-}
-
 function parseJsonOrRaw(rawText) {
   try {
     return rawText ? JSON.parse(rawText) : {};
@@ -680,12 +665,23 @@ function extractPromptText(body = {}) {
 }
 
 function extractInlineImagesFromRequestBody(body = {}) {
+  /** @type {{ mimeType: string, data: string }[]} */
+  const images = [];
+
+  const flat = Array.isArray(body?.images) ? body.images : [];
+  for (const item of flat) {
+    const data = typeof item?.data === "string" ? item.data.trim() : "";
+    if (!data) continue;
+    images.push({
+      mimeType: String(item?.mimeType || item?.mime_type || "image/jpeg"),
+      data,
+    });
+  }
+  if (images.length) return images;
+
   const parts = Array.isArray(body?.contents?.[0]?.parts)
     ? body.contents[0].parts
     : [];
-
-  /** @type {{ mimeType: string, data: string }[]} */
-  const images = [];
 
   parts.forEach((part) => {
     const inline = part?.inline_data || part?.inlineData;
@@ -698,117 +694,6 @@ function extractInlineImagesFromRequestBody(body = {}) {
   });
 
   return images;
-}
-
-async function checkPromptWithOpenRouter(prompt) {
-  if (!OPENROUTER_API_KEY) {
-    return {
-      ok: true,
-      safe: true,
-      shouldBlock: false,
-      hasClearIntent: true,
-    };
-  }
-
-  const schema = {
-    name: "prompt_safety_check",
-    strict: true,
-    schema: {
-      type: "object",
-      properties: {
-        safe: { type: "boolean" },
-        shouldBlock: { type: "boolean" },
-        riskLevel: {
-          type: "string",
-          enum: ["low", "medium", "high"],
-        },
-        reasons: {
-          type: "array",
-          items: { type: "string" },
-        },
-        suggestedRewrite: {
-          anyOf: [{ type: "string" }, { type: "null" }],
-        },
-        shortMessageRu: { type: "string" },
-      },
-      required: [
-        "safe",
-        "shouldBlock",
-        "riskLevel",
-        "reasons",
-        "suggestedRewrite",
-        "shortMessageRu",
-      ],
-      additionalProperties: false,
-    },
-  };
-
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": FRONTEND_ORIGIN,
-        "X-Title": "NanoBanana Prompt Filter",
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        temperature: 0,
-        messages: [
-          {
-            role: "system",
-            content: `Проверь текстовый prompt для генерации изображения.
-            Верни только JSON:
-            {"shouldBlock":false,"hasClearIntent":true}
-
-          Правила:
-          - shouldBlock=true, ТОЛЬКО: обнажёнка.
-          - hasClearIntent=false, если это бессмысленный набор символов, случайные буквы.
-          - Короткие, но понятные запросы (например "кот в шляпе") считаются нормальными.
-          - Ничего кроме JSON не пиши.`,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "prompt_safety_check",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                shouldBlock: { type: "boolean" },
-                hasClearIntent: { type: "boolean" },
-              },
-              required: ["shouldBlock", "hasClearIntent"],
-              additionalProperties: false,
-            },
-          },
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const raw = await response.text();
-    throw new Error(`OpenRouter error ${response.status}: ${raw}`);
-  }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  const parsed = JSON.parse(content);
-
-  return {
-    ok: true,
-    model: OPENROUTER_MODEL,
-    shouldBlock: Boolean(parsed.shouldBlock),
-    hasClearIntent: Boolean(parsed.hasClearIntent),
-  };
 }
 
 function resolveVideoGenerationCost(sound, durationRaw) {
@@ -1534,29 +1419,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    const promptText = extractPromptText(req.body);
-
-    if (promptText.trim()) {
-      const moderation = await checkPromptWithOpenRouter(promptText);
-
-      if (moderation.shouldBlock) {
-        return res.status(422).json({
-          error:
-            moderation.shortMessageRu ||
-            "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
-          code: "PROMPT_BLOCKED",
-          moderation: {
-            safe: moderation.safe,
-            shouldBlock: moderation.shouldBlock,
-            riskLevel: moderation.riskLevel,
-            reasons: moderation.reasons,
-            suggestedRewrite: null,
-            model: moderation.model,
-          },
-        });
-      }
-    }
-
     const upstreamCandidates = buildLaozhangUpstreamCandidates(
       versionCfg.upstreamPath
     );
@@ -1584,7 +1446,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const buildOpenAiStyleJsonBody = () => {
       const prompt = extractPromptText(upstreamPayloadBase);
       const body = {
-        model: "gpt-image-2",
+        model: LAOZHANG_IMAGE_MODEL,
         prompt,
         n: Math.max(1, requestedCount),
         response_format: "b64_json",
@@ -1664,7 +1526,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     };
 
     const candidateUrl = upstreamCandidates[0];
-    const enterpriseCandidateUrl = resolveLaozhangEnterpriseUrl();
 
     let lastError = {
       index: 1,
@@ -1682,42 +1543,68 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
 
       let upstreamResponse;
+      const startedAt = Date.now();
+      const controller = new AbortController();
+      const configuredTimeoutMs = Number(process.env.LAOZHANG_TIMEOUT_MS || 180_000);
+      const timeoutMs =
+        Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+          ? Math.min(Math.max(configuredTimeoutMs, 10_000), 10 * 60_000)
+          : 180_000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (!useEdits) {
-        const jsonBody = buildOpenAiStyleJsonBody();
-        upstreamResponse = await fetch(requestUrl, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(jsonBody),
-        });
-      } else {
-        // Images edits: send first inline image as source (multipart).
-        const form = new FormData();
-        form.append("model", "gpt-image-2");
-        form.append(
-          "prompt",
-          prompt ||
-            "Use the provided image as the source. Preserve subject and composition."
-        );
+      try {
+        if (!useEdits) {
+          const jsonBody = buildOpenAiStyleJsonBody();
+          upstreamResponse = await fetch(requestUrl, {
+            method: "POST",
+            signal: controller.signal,
+            headers,
+            body: JSON.stringify(jsonBody),
+          });
+        } else {
+          // Images edits: send first inline image as source (multipart).
+          const form = new FormData();
+          form.append("model", LAOZHANG_IMAGE_MODEL);
+          form.append(
+            "prompt",
+            prompt ||
+              "Use the provided image as the source. Preserve subject and composition."
+          );
 
-        const first = inlineImages[0];
-        const blob = toBlobFromBase64(first.data, first.mimeType);
-        const ext = (first.mimeType || "").includes("png") ? "png" : "jpg";
-        form.append("image", blob, `source.${ext}`);
+          const first = inlineImages[0];
+          const blob = toBlobFromBase64(first.data, first.mimeType);
+          const ext = (first.mimeType || "").includes("png") ? "png" : "jpg";
+          form.append("image", blob, `source.${ext}`);
 
-        const multipartHeaders = new Headers();
-        if (headers.Authorization) multipartHeaders.set("Authorization", headers.Authorization);
+          const multipartHeaders = new Headers();
+          if (headers.Authorization)
+            multipartHeaders.set("Authorization", headers.Authorization);
 
-        upstreamResponse = await fetch(requestUrl.replace(/\/images\/generations\b/i, "/images/edits"), {
-          method: "POST",
-          headers: multipartHeaders,
-          body: form,
-        });
+          upstreamResponse = await fetch(
+            requestUrl.replace(/\/images\/generations\b/i, "/images/edits"),
+            {
+              method: "POST",
+              signal: controller.signal,
+              headers: multipartHeaders,
+              body: form,
+            }
+          );
+        }
+      } finally {
+        clearTimeout(timeout);
       }
 
       const raw = await upstreamResponse.json().catch(() => ({}));
 
       if (!upstreamResponse.ok) {
+        console.warn("Laozhang upstream non-OK response.", {
+          attempt: attemptIndex,
+          status: upstreamResponse.status,
+          elapsed_ms: Date.now() - startedAt,
+          useEdits,
+          requestUrl,
+          body_preview: JSON.stringify(raw || {}).slice(0, 900),
+        });
         lastError = {
           index: attemptIndex,
           status: upstreamResponse.status,
@@ -1748,31 +1635,47 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     };
 
     const runLaozhangAttempt = async (url, apiKey, attemptIndex) => {
+      const startedAt = Date.now();
       try {
         return await attemptUpstream(url, apiKey, attemptIndex);
       } catch (error) {
+        const cause = error?.cause;
+        console.error("Laozhang upstream fetch exception.", {
+          attempt: attemptIndex,
+          elapsed_ms: Date.now() - startedAt,
+          message: String(error?.message || error || "unknown error"),
+          name: error?.name || "",
+          code: error?.code || cause?.code || "",
+          errno: error?.errno || cause?.errno || "",
+          syscall: error?.syscall || cause?.syscall || "",
+          cause: cause
+            ? {
+                name: cause?.name,
+                message: String(cause?.message || ""),
+                code: cause?.code,
+              }
+            : null,
+          url,
+        });
+
+        const isAbort = error?.name === "AbortError";
         lastError = {
           index: attemptIndex,
-          status: 503,
-          message: error?.message || "Ошибка сервиса",
+          status: isAbort ? 504 : 503,
+          message:
+            error?.message ||
+            (isAbort ? "timeout" : "Ошибка сервиса"),
         };
         return false;
       }
     };
 
-    const primaryOk = await runLaozhangAttempt(
+    // Одна попытка к основному URL — повтор на том же эндпоинте не делаем (лишнее ожидание).
+    await runLaozhangAttempt(
       candidateUrl,
       LAOZHANG_API_KEY,
       1
     );
-
-    if (!primaryOk && enterpriseCandidateUrl) {
-      await runLaozhangAttempt(
-        enterpriseCandidateUrl,
-        LAOZHANG_API_KEY_ENTERPRISE,
-        2
-      );
-    }
 
     if (!generatedImages.length) {
       generationErrors.push(lastError);
@@ -2099,12 +2002,6 @@ app.listen(PORT, () => {
     `Payments: provider=${PAYMENT_PROVIDER_URL}, authMode=${PAYMENT_PROVIDER_AUTH_MODE}, return=${PAYMENT_RETURN_URL}, merchant=${
       PAYMENT_PROVIDER_MERCHANT_ID ? "set" : "missing"
     }, secret=${PAYMENT_PROVIDER_SECRET ? "set" : "missing"}`
-  );
-
-  console.log(
-    `Prompt filter: model=${OPENROUTER_MODEL}, openrouterKey=${
-      OPENROUTER_API_KEY ? "set" : "missing"
-    }`
   );
 
   console.log(
