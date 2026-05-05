@@ -245,6 +245,9 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
   "x-webhook-secret"
 );
 
+const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
+const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
+
 const KIE_API_KEY = normalizeEnv(process.env.KIE_API_KEY);
 const KIE_API_BASE = normalizeEnv(process.env.KIE_API_BASE, "https://api.kie.ai");
 const TMPFILES_UPLOAD_URL = normalizeEnv(
@@ -722,6 +725,105 @@ function extractPromptText(body = {}) {
   ].filter((value) => typeof value === "string" && value.trim());
 
   return directCandidates[0] || "";
+}
+
+/**
+ * Фильтр промпта через OpenRouter до вызова Laozhang. Без ключа — пропускает запрос.
+ */
+async function checkPromptWithOpenRouter(prompt) {
+  if (!OPENROUTER_API_KEY) {
+    return {
+      ok: true,
+      safe: true,
+      shouldBlock: false,
+      hasClearIntent: true,
+      model: null,
+    };
+  }
+
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": FRONTEND_ORIGIN,
+        "X-Title": "NanoBanana Prompt Filter",
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content: `Проверь текстовый prompt для генерации изображения.
+            Верни только JSON:
+            {"shouldBlock":false,"hasClearIntent":true}
+
+          Правила:
+          - shouldBlock=true, ТОЛЬКО: обнажёнка.
+          - hasClearIntent=false, если это бессмысленный набор символов, случайные буквы.
+          - Короткие, но понятные запросы (например "кот в шляпе") считаются нормальными.
+          - Ничего кроме JSON не пиши.`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "prompt_safety_check",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                shouldBlock: { type: "boolean" },
+                hasClearIntent: { type: "boolean" },
+              },
+              required: ["shouldBlock", "hasClearIntent"],
+              additionalProperties: false,
+            },
+          },
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`OpenRouter error ${response.status}: ${raw}`);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  let parsed;
+  try {
+    parsed =
+      typeof content === "string" && content.trim()
+        ? JSON.parse(content)
+        : {};
+  } catch {
+    throw new Error("OpenRouter returned invalid JSON");
+  }
+
+  const shouldBlock = Boolean(parsed.shouldBlock);
+  const hasClearIntent = parsed.hasClearIntent !== false;
+
+  return {
+    ok: true,
+    model: OPENROUTER_MODEL,
+    safe: !shouldBlock,
+    shouldBlock,
+    hasClearIntent,
+    riskLevel: shouldBlock ? "high" : "low",
+    reasons: shouldBlock ? ["explicit_content"] : [],
+    shortMessageRu:
+      "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
+    suggestedRewrite: null,
+  };
 }
 
 function extractInlineImagesFromRequestBody(body = {}) {
@@ -1490,6 +1592,39 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         balance: currentBalance,
         required: 1,
       });
+    }
+
+    const promptText = extractPromptText(req.body);
+
+    if (promptText.trim()) {
+      let moderation;
+      try {
+        moderation = await checkPromptWithOpenRouter(promptText);
+      } catch (error) {
+        console.error("OpenRouter prompt check failed", error);
+        return res.status(503).json({
+          error:
+            "Проверка промпта временно недоступна. Попробуйте через минуту.",
+          code: "PROMPT_CHECK_UNAVAILABLE",
+        });
+      }
+
+      if (moderation.shouldBlock) {
+        return res.status(422).json({
+          error:
+            moderation.shortMessageRu ||
+            "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
+          code: "PROMPT_BLOCKED",
+          moderation: {
+            safe: moderation.safe,
+            shouldBlock: moderation.shouldBlock,
+            riskLevel: moderation.riskLevel,
+            reasons: moderation.reasons,
+            suggestedRewrite: moderation.suggestedRewrite,
+            model: moderation.model,
+          },
+        });
+      }
     }
 
     const upstreamPayloadBase = { ...req.body };
@@ -2379,6 +2514,12 @@ app.listen(PORT, () => {
     `Payments: provider=${PAYMENT_PROVIDER_URL}, authMode=${PAYMENT_PROVIDER_AUTH_MODE}, return=${PAYMENT_RETURN_URL}, merchant=${
       PAYMENT_PROVIDER_MERCHANT_ID ? "set" : "missing"
     }, secret=${PAYMENT_PROVIDER_SECRET ? "set" : "missing"}`
+  );
+
+  console.log(
+    `Prompt filter: model=${OPENROUTER_MODEL || "—"}, openrouterKey=${
+      OPENROUTER_API_KEY ? "set" : "missing"
+    }`
   );
 
   console.log(
