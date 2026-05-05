@@ -146,8 +146,10 @@ const LAOZHANG_IMAGE_MODEL = normalizeEnv(
 );
 
 /** `true` (по умолчанию) — Images API (generations/edits). `false` — Gemini generateContent. */
-const LAOZHANG_IS_GPT_IMAGE =
-  String(process.env.LAOZHANG_IS_GPT_IMAGE ?? "true").toLowerCase() !== "false";
+const LAOZHANG_IS_GPT_IMAGE = (() => {
+  const v = normalizeEnv(process.env.LAOZHANG_IS_GPT_IMAGE, "true").toLowerCase();
+  return !["false", "0", "no", "off"].includes(v);
+})();
 
 const LAOZHANG_GEMINI_MODEL_PATH = normalizeEnv(
   process.env.LAOZHANG_GEMINI_MODEL_PATH,
