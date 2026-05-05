@@ -130,31 +130,82 @@ const normalizeLaozhangHost = (value) =>
     .replace(/^https?:\/\//i, "")
     .replace(/\/+$/, "");
 
-const LAOZHANG_URL = normalizeLaozhangPath(process.env.LAOZHANG_URL);
+/**
+ * `LAOZHANG_URL` — полный URL GPT Images (например `https://api.laozhang.ai/v1/images/generations`).
+ * Хост оттуда же используется для относительного `LAOZHANG_GEMINI_MODEL`.
+ * Устар.: только путь в `LAOZHANG_URL` + `LAOZHANG_URL_1` (хост) — всё ещё собирается во временный полный URL.
+ */
+function resolveLaozhangImagesEnv() {
+  const raw = normalizeEnv(process.env.LAOZHANG_URL);
+  if (!raw) return { imagesFullUrl: "", primaryHost: "" };
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      const path = (u.pathname || "").replace(/\/+$/, "") || "";
+      const origin = u.origin;
+      let imagesFullUrl = path ? `${origin}${path}` : origin;
+      imagesFullUrl = imagesFullUrl.replace(/\/v1\/beta\//gi, "/v1beta/");
+      return {
+        imagesFullUrl,
+        primaryHost: u.hostname || "",
+      };
+    } catch {
+      return { imagesFullUrl: "", primaryHost: "" };
+    }
+  }
+
+  const legacyHost = normalizeLaozhangHost(process.env.LAOZHANG_URL_1 || "");
+  const pathOnly = normalizeLaozhangPath(raw);
+  if (legacyHost && pathOnly) {
+    return {
+      imagesFullUrl: `https://${legacyHost}${pathOnly}`.replace(
+        /\/v1\/beta\//gi,
+        "/v1beta/"
+      ),
+      primaryHost: legacyHost,
+    };
+  }
+
+  return { imagesFullUrl: "", primaryHost: "" };
+}
+
+const { imagesFullUrl: LAOZHANG_IMAGES_URL, primaryHost: LAOZHANG_PRIMARY_HOST } =
+  resolveLaozhangImagesEnv();
+
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
 const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
   "bearer"
 ).toLowerCase();
 
-const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
-
-/** Как в Laozhang Images API: `gpt-image-2-vip` или переопределение через env. */
-const LAOZHANG_IMAGE_MODEL = normalizeEnv(
-  process.env.LAOZHANG_IMAGE_MODEL,
+/** Шаг 1 каскада: имя модели GPT Images (Laozhang). Env `GPT_MODEL`; fallback `LAOZHANG_IMAGE_MODEL`. */
+const GPT_MODEL = normalizeEnv(
+  process.env.GPT_MODEL || process.env.LAOZHANG_IMAGE_MODEL,
   "gpt-image-2-vip"
 );
 
-/** `true` (по умолчанию) — Images API (generations/edits). `false` — Gemini generateContent. */
-const LAOZHANG_IS_GPT_IMAGE = (() => {
-  const v = normalizeEnv(process.env.LAOZHANG_IS_GPT_IMAGE, "true").toLowerCase();
-  return !["false", "0", "no", "off"].includes(v);
-})();
-
-const LAOZHANG_GEMINI_MODEL_PATH = normalizeEnv(
-  process.env.LAOZHANG_GEMINI_MODEL_PATH,
+/** Шаг 2: Gemini `generateContent` — путь на хосте или полный URL. Env `LAOZHANG_GEMINI_MODEL`; fallback `LAOZHANG_GEMINI_MODEL_PATH`. */
+const LAOZHANG_GEMINI_MODEL = normalizeEnv(
+  process.env.LAOZHANG_GEMINI_MODEL || process.env.LAOZHANG_GEMINI_MODEL_PATH,
   "/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
 );
+
+/** Шаг 3: тот же Gemini endpoint, что и шаг 2, но с этим ключом (enterprise). Env `LAOZHANG_ENTERPRISE_TOKEN`; fallback `LAOZHANG_ENTERPRISE_API_KEY`. Пусто — шаг 3 отключён. */
+const LAOZHANG_ENTERPRISE_TOKEN = normalizeEnv(
+  process.env.LAOZHANG_ENTERPRISE_TOKEN || process.env.LAOZHANG_ENTERPRISE_API_KEY
+);
+
+function resolveLaozhangAbsoluteUrl(host, pathOrFullUrl) {
+  const raw = normalizeEnv(pathOrFullUrl);
+  if (!raw) return "";
+  const normalizedFull = raw.replace("/v1/beta/", "/v1beta/");
+  if (/^https?:\/\//i.test(normalizedFull)) return normalizedFull;
+  const h = normalizeLaozhangHost(host);
+  if (!h) return "";
+  const path = normalizeLaozhangPath(normalizedFull);
+  return path ? `https://${h}${path}` : "";
+}
 
 const PAYMENT_PROVIDER_URL =
   normalizeEnv(process.env.PAYMENT_PROVIDER_URL) ||
@@ -525,7 +576,7 @@ function resolveVersionConfig(versionRuntime) {
       versionStorage: "FREE",
       balanceColumn: SUPABASE_BALANCE_FREE_COLUMN,
       pricesTable: SUPABASE_PRICES_FREE_TABLE,
-      upstreamPath: LAOZHANG_URL,
+      upstreamUrl: LAOZHANG_IMAGES_URL,
     };
   }
 
@@ -534,14 +585,13 @@ function resolveVersionConfig(versionRuntime) {
     versionStorage: "PRO",
     balanceColumn: SUPABASE_BALANCE_COLUMN,
     pricesTable: SUPABASE_PRICES_TABLE,
-    upstreamPath: LAOZHANG_URL,
+    upstreamUrl: LAOZHANG_IMAGES_URL,
   };
 }
 
-function buildLaozhangUpstreamCandidates(upstreamPath) {
-  if (!upstreamPath) return [];
-  if (!LAOZHANG_PRIMARY_HOST) return [];
-  return [`https://${LAOZHANG_PRIMARY_HOST}${upstreamPath}`];
+function buildLaozhangUpstreamCandidates(upstreamFullUrl) {
+  if (!upstreamFullUrl) return [];
+  return [upstreamFullUrl];
 }
 
 function buildLaozhangRequest(url, options = {}) {
@@ -1462,44 +1512,42 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    let candidateUrl = "";
-    let geminiFullUrl = "";
+    const geminiNeedsHost =
+      Boolean(normalizeEnv(process.env.LAOZHANG_GEMINI_MODEL)) &&
+      !/^https?:\/\//i.test(normalizeEnv(process.env.LAOZHANG_GEMINI_MODEL));
+    if (geminiNeedsHost && !LAOZHANG_PRIMARY_HOST) {
+      return res.status(500).json({
+        error:
+          "Задайте LAOZHANG_URL полным URL (https://…) или укажите LAOZHANG_GEMINI_MODEL полным адресом.",
+      });
+    }
 
-    if (LAOZHANG_IS_GPT_IMAGE) {
-      if (!versionCfg.upstreamPath) {
-        return res.status(500).json({
-          error: "LAOZHANG_URL не настроен (путь Images API)",
-        });
-      }
+    let candidateUrl = "";
+    if (versionCfg.upstreamUrl) {
       const upstreamCandidates = buildLaozhangUpstreamCandidates(
-        versionCfg.upstreamPath
+        versionCfg.upstreamUrl
       );
-      if (!upstreamCandidates.length) {
-        return res.status(500).json({
-          error: "Не настроен хост LAOZHANG_URL_1",
-        });
+      if (upstreamCandidates.length) {
+        candidateUrl = upstreamCandidates[0];
       }
-      candidateUrl = upstreamCandidates[0];
-    } else {
-      if (!LAOZHANG_PRIMARY_HOST) {
-        return res.status(500).json({
-          error:
-            "Не настроен LAOZHANG_URL_1 (хост для Gemini generateContent)",
-        });
-      }
-      const geminiPath = normalizeLaozhangPath(LAOZHANG_GEMINI_MODEL_PATH);
-      if (!geminiPath) {
-        return res.status(500).json({
-          error: "Не задан LAOZHANG_GEMINI_MODEL_PATH",
-        });
-      }
-      geminiFullUrl = `https://${LAOZHANG_PRIMARY_HOST}${geminiPath}`;
+    }
+
+    const geminiFullUrl = resolveLaozhangAbsoluteUrl(
+      LAOZHANG_PRIMARY_HOST,
+      LAOZHANG_GEMINI_MODEL
+    );
+
+    if (!candidateUrl && !geminiFullUrl) {
+      return res.status(500).json({
+        error:
+          "Нет канала генерации: задайте LAOZHANG_URL и/или LAOZHANG_GEMINI_MODEL",
+      });
     }
 
     const buildOpenAiStyleJsonBody = () => {
       const prompt = extractPromptText(upstreamPayloadBase);
       const body = {
-        model: LAOZHANG_IMAGE_MODEL,
+        model: GPT_MODEL,
         prompt,
         n: Math.max(1, requestedCount),
         response_format: "b64_json",
@@ -1628,7 +1676,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         } else {
           // Images edits: multipart — model, prompt, image (@file).
           const form = new FormData();
-          form.append("model", LAOZHANG_IMAGE_MODEL);
+          form.append("model", GPT_MODEL);
           form.append(
             "prompt",
             prompt ||
@@ -1946,14 +1994,44 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return false;
     };
 
-    if (LAOZHANG_IS_GPT_IMAGE) {
-      await runLaozhangAttempt(
-        candidateUrl,
-        LAOZHANG_API_KEY,
-        1
-      );
-    } else {
-      await runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 1);
+    const tierDefs = [];
+    if (candidateUrl) {
+      tierDefs.push({
+        run: () => runLaozhangAttempt(candidateUrl, LAOZHANG_API_KEY, 1),
+      });
+    }
+    if (geminiFullUrl) {
+      tierDefs.push({
+        run: () => runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 2),
+      });
+    }
+    if (geminiFullUrl && LAOZHANG_ENTERPRISE_TOKEN) {
+      tierDefs.push({
+        run: () =>
+          runGeminiAttempt(geminiFullUrl, LAOZHANG_ENTERPRISE_TOKEN, 3),
+      });
+    }
+
+    const cascadeTotal = tierDefs.length;
+    const reconnectNotices = [];
+    let fallbackTierUsed = 0;
+
+    for (let i = 0; i < tierDefs.length; i++) {
+      if (i > 0) {
+        const msg = `Переподключаемся x${i + 1}/${cascadeTotal}…`;
+        reconnectNotices.push(msg);
+        console.warn("Laozhang cascade", {
+          step: i + 1,
+          total: cascadeTotal,
+          message: msg,
+        });
+      }
+      generatedImages.length = 0;
+      const ok = await tierDefs[i].run();
+      if (ok) {
+        fallbackTierUsed = i + 1;
+        break;
+      }
     }
 
     if (!generatedImages.length) {
@@ -2015,6 +2093,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       partial: generatedImages.length < requestedCount,
       failed: Math.max(0, requestedCount - generatedImages.length),
       errors: generationErrors,
+      fallbackTier: fallbackTierUsed,
+      cascadeTotal,
+      reconnectNotices:
+        fallbackTierUsed > 1 ? reconnectNotices : [],
     });
   } catch (error) {
     console.error("generate error", error);
@@ -2304,7 +2386,7 @@ app.listen(PORT, () => {
   );
 
   console.log(
-    `Laozhang image: ${LAOZHANG_IS_GPT_IMAGE ? "gpt " + LAOZHANG_IMAGE_MODEL : "gemini " + LAOZHANG_GEMINI_MODEL_PATH}`
+    `Laozhang cascade: GPT_MODEL=${GPT_MODEL} → LAOZHANG_GEMINI_MODEL=${LAOZHANG_GEMINI_MODEL || "—"} → LAOZHANG_ENTERPRISE_TOKEN=${LAOZHANG_ENTERPRISE_TOKEN ? "set" : "off"}`
   );
 
   console.log(`Backend started on port ${PORT}`);

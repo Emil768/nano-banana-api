@@ -46,8 +46,13 @@ npm start
 - `SUPABASE_PRICE_AMOUNT_COLUMN=price_rub`
 - `SUPABASE_VERSION_COLUMN=version`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
-- `LAOZHANG_URL=/v1/images/generations` — путь Laozhang Images API (один для free и pro)
-- `LAOZHANG_URL_1=api.laozhang.ai` — хост без `https://`
+- `LAOZHANG_URL=https://api.laozhang.ai/v1/images/generations` — полный URL шага 1 (GPT Images); хост из того же значения используется для относительного `LAOZHANG_GEMINI_MODEL`. Устаревший вариант: только путь в `LAOZHANG_URL` + отдельный хост в `LAOZHANG_URL_1`
+- `GPT_MODEL=gpt-image-2-vip` — модель для шага 1 (Images API)
+- `LAOZHANG_GEMINI_MODEL=/v1beta/models/…:generateContent` — шаг 2 (Gemini): путь на том же хосте или полный URL
+- `LAOZHANG_ENTERPRISE_TOKEN=` — опционально шаг 3: тот же Gemini endpoint (`LAOZHANG_GEMINI_MODEL`), но запрос с этим ключом вместо `LAOZHANG_API_KEY`; пусто — третий шаг отключён
+
+Каскад: (1) GPT Images, (2) Gemini с основным ключом, (3) тот же Gemini URL с enterprise-токеном. В ответе `POST /api/generate-image` могут быть `fallbackTier`, `cascadeTotal`, `reconnectNotices`. Для моделей шага 1 и пути Gemini поддерживаются fallback-имена env: `LAOZHANG_IMAGE_MODEL`, `LAOZHANG_GEMINI_MODEL_PATH`.
+
 - `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
 - `PAYMENT_PROVIDER_URL=https://app.platega.io/transaction/process`
 - `PAYMENT_PROVIDER_API_KEY=...`
