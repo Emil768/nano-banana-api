@@ -131,7 +131,6 @@ const normalizeLaozhangHost = (value) =>
     .replace(/\/+$/, "");
 
 const LAOZHANG_URL = normalizeLaozhangPath(process.env.LAOZHANG_URL);
-const LAOZHANG_URL_FREE = normalizeLaozhangPath(process.env.LAOZHANG_URL_FREE);
 const LAOZHANG_API_KEY = normalizeEnv(process.env.LAOZHANG_API_KEY);
 const LAOZHANG_AUTH_MODE = normalizeEnv(
   process.env.LAOZHANG_AUTH_MODE,
@@ -144,6 +143,15 @@ const LAOZHANG_PRIMARY_HOST = normalizeLaozhangHost(process.env.LAOZHANG_URL_1);
 const LAOZHANG_IMAGE_MODEL = normalizeEnv(
   process.env.LAOZHANG_IMAGE_MODEL,
   "gpt-image-2-vip"
+);
+
+/** `true` (по умолчанию) — Images API (generations/edits). `false` — Gemini generateContent. */
+const LAOZHANG_IS_GPT_IMAGE =
+  String(process.env.LAOZHANG_IS_GPT_IMAGE ?? "true").toLowerCase() !== "false";
+
+const LAOZHANG_GEMINI_MODEL_PATH = normalizeEnv(
+  process.env.LAOZHANG_GEMINI_MODEL_PATH,
+  "/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
 );
 
 const PAYMENT_PROVIDER_URL =
@@ -515,7 +523,7 @@ function resolveVersionConfig(versionRuntime) {
       versionStorage: "FREE",
       balanceColumn: SUPABASE_BALANCE_FREE_COLUMN,
       pricesTable: SUPABASE_PRICES_FREE_TABLE,
-      upstreamPath: LAOZHANG_URL_FREE,
+      upstreamPath: LAOZHANG_URL,
     };
   }
 
@@ -1432,25 +1440,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    const upstreamCandidates = buildLaozhangUpstreamCandidates(
-      versionCfg.upstreamPath
-    );
-
-    if (!versionCfg.upstreamPath) {
-      return res.status(500).json({
-        error:
-          requestedVersion === "free"
-            ? "LAОZHANG_URL_FREE не настроен"
-            : "LAOZHANG_URL не настроен",
-      });
-    }
-
-    if (!upstreamCandidates.length) {
-      return res.status(500).json({
-        error: "Не настроен хост LAOZHANG_URL_1",
-      });
-    }
-
     const upstreamPayloadBase = { ...req.body };
     delete upstreamPayloadBase.version;
 
@@ -1469,6 +1458,40 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           "Нужен base64 в images[].data или в image.data, не только mimeType. Прикрепите файл заново.",
         code: "MISSING_IMAGE_DATA",
       });
+    }
+
+    let candidateUrl = "";
+    let geminiFullUrl = "";
+
+    if (LAOZHANG_IS_GPT_IMAGE) {
+      if (!versionCfg.upstreamPath) {
+        return res.status(500).json({
+          error: "LAOZHANG_URL не настроен (путь Images API)",
+        });
+      }
+      const upstreamCandidates = buildLaozhangUpstreamCandidates(
+        versionCfg.upstreamPath
+      );
+      if (!upstreamCandidates.length) {
+        return res.status(500).json({
+          error: "Не настроен хост LAOZHANG_URL_1",
+        });
+      }
+      candidateUrl = upstreamCandidates[0];
+    } else {
+      if (!LAOZHANG_PRIMARY_HOST) {
+        return res.status(500).json({
+          error:
+            "Не настроен LAOZHANG_URL_1 (хост для Gemini generateContent)",
+        });
+      }
+      const geminiPath = normalizeLaozhangPath(LAOZHANG_GEMINI_MODEL_PATH);
+      if (!geminiPath) {
+        return res.status(500).json({
+          error: "Не задан LAOZHANG_GEMINI_MODEL_PATH",
+        });
+      }
+      geminiFullUrl = `https://${LAOZHANG_PRIMARY_HOST}${geminiPath}`;
     }
 
     const buildOpenAiStyleJsonBody = () => {
@@ -1552,8 +1575,6 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       if (rawError?.type) return String(rawError.type);
       return "Ошибка сервиса";
     };
-
-    const candidateUrl = upstreamCandidates[0];
 
     const laozhangSocketRetries = Math.max(
       0,
@@ -1677,6 +1698,104 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return true;
     };
 
+    const attemptGeminiUpstream = async (url, apiKey, attemptIndex) => {
+      const prompt = extractPromptText(upstreamPayloadBase);
+      const parts = [];
+      const text = typeof prompt === "string" ? prompt.trim() : "";
+      if (text) parts.push({ text });
+
+      for (const img of inlineImages) {
+        const clean = String(img.data || "")
+          .trim()
+          .replace(/^data:.*?;base64,/i, "");
+        if (!clean) continue;
+        parts.push({
+          inline_data: {
+            mime_type: img.mimeType || "image/jpeg",
+            data: clean,
+          },
+        });
+      }
+
+      if (!parts.length) {
+        parts.push({
+          text: "Generate an image according to the user request.",
+        });
+      }
+
+      const jsonBody = {
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+        },
+      };
+
+      const { requestUrl, headers } = buildLaozhangRequest(url, {
+        apiKey,
+      });
+
+      let upstreamResponse;
+      const startedAt = Date.now();
+      const controller = new AbortController();
+      const configuredTimeoutMs = Number(process.env.LAOZHANG_TIMEOUT_MS || 180_000);
+      const timeoutMs =
+        Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+          ? Math.min(Math.max(configuredTimeoutMs, 10_000), 10 * 60_000)
+          : 180_000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        upstreamResponse = await fetch(requestUrl, {
+          method: "POST",
+          signal: controller.signal,
+          headers,
+          body: JSON.stringify(jsonBody),
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const raw = await upstreamResponse.json().catch(() => ({}));
+
+      if (!upstreamResponse.ok) {
+        console.warn("Laozhang Gemini upstream non-OK response.", {
+          attempt: attemptIndex,
+          status: upstreamResponse.status,
+          elapsed_ms: Date.now() - startedAt,
+          requestUrl,
+          body_preview: JSON.stringify(raw || {}).slice(0, 900),
+        });
+        lastError = {
+          index: attemptIndex,
+          status: upstreamResponse.status,
+          message: normalizeUpstreamErrorMessage(
+            raw?.error || raw?.message || raw
+          ),
+        };
+        return false;
+      }
+
+      const extractedImages = await extractImagesFromRaw(raw);
+
+      if (!extractedImages.length) {
+        lastError = {
+          index: attemptIndex,
+          status: 502,
+          message: "Сервис вернул ответ без изображения",
+        };
+        return false;
+      }
+
+      for (const item of extractedImages) {
+        generatedImages.push({
+          imageData: item.imageData,
+          mimeType: item.mimeType,
+          raw,
+        });
+      }
+      return true;
+    };
+
     const runLaozhangAttempt = async (url, apiKey, attemptIndex) => {
       const effectiveUrlForLog =
         inlineImages.length > 0
@@ -1753,11 +1872,87 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return false;
     };
 
-    await runLaozhangAttempt(
-      candidateUrl,
-      LAOZHANG_API_KEY,
-      1
-    );
+    const runGeminiAttempt = async (url, apiKey, attemptIndex) => {
+      const effectiveUrlForLog = String(url);
+      const maxSocketAttempts = 1 + laozhangSocketRetries;
+
+      for (let socketTry = 0; socketTry < maxSocketAttempts; socketTry++) {
+        const startedAt = Date.now();
+        if (socketTry > 0) {
+          await new Promise((r) =>
+            setTimeout(r, laozhangSocketRetryDelayMs)
+          );
+          console.warn("Laozhang Gemini socket retry after transient failure.", {
+            attempt: attemptIndex,
+            socketTry: socketTry + 1,
+            url: effectiveUrlForLog,
+          });
+        }
+
+        try {
+          const ok = await attemptGeminiUpstream(url, apiKey, attemptIndex);
+          if (ok) return true;
+          return false;
+        } catch (error) {
+          const cause = error?.cause;
+          const netCode = error?.code || cause?.code || "";
+          const causeMsg = String(cause?.message || "");
+          const transient =
+            netCode === "EPIPE" ||
+            netCode === "UND_ERR_SOCKET" ||
+            /other side closed|ECONNRESET|ETIMEDOUT/i.test(causeMsg);
+
+          console.error("Laozhang Gemini upstream fetch exception.", {
+            attempt: attemptIndex,
+            socketTry: socketTry + 1,
+            elapsed_ms: Date.now() - startedAt,
+            message: String(error?.message || error || "unknown error"),
+            name: error?.name || "",
+            code: netCode,
+            errno: error?.errno || cause?.errno || "",
+            syscall: error?.syscall || cause?.syscall || "",
+            cause: cause
+              ? {
+                  name: cause?.name,
+                  message: causeMsg,
+                  code: cause?.code,
+                }
+              : null,
+            url: effectiveUrlForLog,
+            hint:
+              netCode === "EPIPE" || netCode === "UND_ERR_SOCKET"
+                ? "Соединение с API оборвалось во время запроса (сеть, таймаут или обрыв на стороне upstream)."
+                : undefined,
+          });
+
+          const isAbort = error?.name === "AbortError";
+          lastError = {
+            index: attemptIndex,
+            status: isAbort ? 504 : 503,
+            message:
+              error?.message ||
+              (isAbort ? "timeout" : "Ошибка сервиса"),
+          };
+
+          if (transient && !isAbort && socketTry < maxSocketAttempts - 1) {
+            continue;
+          }
+          return false;
+        }
+      }
+
+      return false;
+    };
+
+    if (LAOZHANG_IS_GPT_IMAGE) {
+      await runLaozhangAttempt(
+        candidateUrl,
+        LAOZHANG_API_KEY,
+        1
+      );
+    } else {
+      await runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 1);
+    }
 
     if (!generatedImages.length) {
       generationErrors.push(lastError);
@@ -2104,6 +2299,10 @@ app.listen(PORT, () => {
 
   console.log(
     `KIE video: apiKey=${KIE_API_KEY ? "set" : "missing"}, base=${KIE_API_BASE}`
+  );
+
+  console.log(
+    `Laozhang image: ${LAOZHANG_IS_GPT_IMAGE ? "gpt " + LAOZHANG_IMAGE_MODEL : "gemini " + LAOZHANG_GEMINI_MODEL_PATH}`
   );
 
   console.log(`Backend started on port ${PORT}`);

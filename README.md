@@ -46,7 +46,8 @@ npm start
 - `SUPABASE_PRICE_AMOUNT_COLUMN=price_rub`
 - `SUPABASE_VERSION_COLUMN=version`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
-- `LAOZHANG_URL_FREE=https://api.laozhang.ai/v1beta/models/gemini-2.5-flash-image:generateContent`
+- `LAOZHANG_URL=/v1/images/generations` — путь Laozhang Images API (один для free и pro)
+- `LAOZHANG_URL_1=api.laozhang.ai` — хост без `https://`
 - `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
 - `PAYMENT_PROVIDER_URL=https://app.platega.io/transaction/process`
 - `PAYMENT_PROVIDER_API_KEY=...`
