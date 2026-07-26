@@ -293,9 +293,23 @@ app.use(
 );
 
 function signTelegramDataCheck(dataObj, botToken) {
+  /** Только поля, которые подписывает Telegram Login Widget. */
+  const telegramKeys = new Set([
+    "id",
+    "first_name",
+    "last_name",
+    "username",
+    "photo_url",
+    "auth_date",
+  ]);
+
   const sortedPairs = Object.keys(dataObj)
     .filter(
-      (k) => k !== "hash" && dataObj[k] !== undefined && dataObj[k] !== null
+      (k) =>
+        telegramKeys.has(k) &&
+        dataObj[k] !== undefined &&
+        dataObj[k] !== null &&
+        String(dataObj[k]).length > 0
     )
     .sort()
     .map((k) => `${k}=${dataObj[k]}`);
