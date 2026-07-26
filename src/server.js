@@ -2503,6 +2503,102 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
   }
 });
 
+app.get("/", (_req, res) => {
+  const telegramUrl = "https://t.me/nano_bananaa_ai_bot";
+  const heroImage =
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Telegram_logo.svg/3840px-Telegram_logo.svg.png?utm_source=ru.wikiquote.org&utm_campaign=index&utm_content=thumbnail";
+
+  res
+    .status(200)
+    .type("html")
+    .send(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Нано Банана</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: Geologica, Helvetica, Arial, sans-serif;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.78)),
+        #0b1020;
+      color: #f5f7ff;
+      text-align: center;
+    }
+    .card {
+      width: min(520px, 100%);
+      padding: 28px 24px 32px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+    }
+    a.tg {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+    }
+    img {
+      width: min(150px, 100%);
+      height: auto;
+      border-radius: 16px;
+      display: block;
+      margin: 0 auto 20px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 10px; font-size: 1.45rem; }
+    p { margin: 0 0 22px; line-height: 1.5; color: rgba(245,247,255,.82); }
+    .open {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 40px;
+      border-radius: 50px;
+      border: 1px solid rgba(45, 156, 219, 0.55);
+      background: linear-gradient(
+        135deg,
+        rgba(45, 156, 219, 0.92) 0%,
+        rgba(34, 122, 184, 0.92) 100%
+      );
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 700;
+      line-height: 1.2;
+      text-decoration: none;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.2s ease;
+    }
+    .open:hover {
+      color: #fff;
+      filter: brightness(1.06);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <a class="tg" href="${telegramUrl}" target="_blank" rel="noopener noreferrer">
+      <img src="${heroImage}" alt="Telegram" width="150" height="150" />
+    </a>
+    <h1>Нано Банана</h1>
+    <p>Проводим технические работы на сайте, скоро вернемся!</p>
+    <p>Доступно в боте 👇</p>
+    <a class="open" href="${telegramUrl}" target="_blank" rel="noopener noreferrer">открыть</a>
+  </main>
+</body>
+</html>`);
+});
+
 app.listen(PORT, () => {
   console.log(
     `Config: table=${SUPABASE_USERS_TABLE}, chatColumn=${SUPABASE_CHAT_ID_COLUMN}, versionColumn=${SUPABASE_VERSION_COLUMN}, pricesTable=${SUPABASE_PRICES_TABLE}, pricesFreeTable=${SUPABASE_PRICES_FREE_TABLE}, origins=${ALLOWED_ORIGINS.join(
