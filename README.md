@@ -12,6 +12,7 @@
 2. Домен API (пример: `https://api.nanobananaa.ru`).
 3. Данные:
    - `TELEGRAM_BOT_TOKEN`
+   - `FEEDBACK_CHAT_ID` — chat id хелпера/группы для отзывов с `/feedback`
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `LAOZHANG_API_KEY`

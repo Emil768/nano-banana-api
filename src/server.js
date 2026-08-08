@@ -45,6 +45,8 @@ const TELEGRAM_BOT_TOKEN = normalizeEnv(process.env.TELEGRAM_BOT_TOKEN);
 const TELEGRAM_WIDGET_MAX_AGE_SECONDS = Number(
   process.env.TELEGRAM_WIDGET_MAX_AGE_SECONDS || 300
 );
+/** Chat id хелпер-аккаунта (или группы), куда слать отзывы с /feedback. */
+const FEEDBACK_CHAT_ID = normalizeEnv(process.env.FEEDBACK_CHAT_ID);
 
 const GOOGLE_CLIENT_ID = normalizeEnv(process.env.GOOGLE_CLIENT_ID);
 const GOOGLE_CLIENT_SECRET = normalizeEnv(process.env.GOOGLE_CLIENT_SECRET);
@@ -1026,6 +1028,109 @@ function pruneVideoJobMaps() {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+async function sendTelegramMessage(chatId, text) {
+  if (!TELEGRAM_BOT_TOKEN) {
+    throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+  }
+  if (!chatId) {
+    throw new Error("FEEDBACK_CHAT_ID is not configured");
+  }
+
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      disable_web_page_preview: true,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    const detail =
+      typeof data?.description === "string"
+        ? data.description
+        : `HTTP ${response.status}`;
+    throw new Error(`Telegram sendMessage failed: ${detail}`);
+  }
+
+  return data;
+}
+
+function clampFeedbackText(value, max = 2000) {
+  return String(value ?? "")
+    .trim()
+    .slice(0, max);
+}
+
+app.post("/api/feedback", async (req, res) => {
+  try {
+    if (!TELEGRAM_BOT_TOKEN || !FEEDBACK_CHAT_ID) {
+      return res.status(503).json({
+        error: "Отзывы временно недоступны. Попробуйте позже.",
+        code: "FEEDBACK_NOT_CONFIGURED",
+      });
+    }
+
+    const rating = Number(req.body?.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        error: "Укажите оценку от 1 до 5.",
+        code: "INVALID_RATING",
+      });
+    }
+
+    const liked = clampFeedbackText(req.body?.liked);
+    const improve = clampFeedbackText(req.body?.improve);
+    if (!liked && !improve) {
+      return res.status(400).json({
+        error: "Заполните хотя бы одно текстовое поле.",
+        code: "EMPTY_FEEDBACK",
+      });
+    }
+
+    const username = clampFeedbackText(req.body?.username, 64).replace(
+      /^@+/,
+      ""
+    );
+    const chatIdFromClient = clampFeedbackText(
+      req.body?.chat_id ?? req.body?.chatId,
+      64
+    );
+    const who = username
+      ? `@${username}`
+      : chatIdFromClient
+        ? `ID ${chatIdFromClient}`
+        : "Гость";
+
+    const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
+    const lines = [
+      "📝 Новый отзыв с сайта",
+      "",
+      `👤 ${who}`,
+      `⭐ Оценка: ${stars} (${rating}/5)`,
+    ];
+
+    if (liked) {
+      lines.push("", "👍 Понравилось:", liked);
+    }
+    if (improve) {
+      lines.push("", "🔧 Можно улучшить:", improve);
+    }
+
+    await sendTelegramMessage(FEEDBACK_CHAT_ID, lines.join("\n"));
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("feedback error", error);
+    return res.status(500).json({
+      error: "Не удалось отправить отзыв. Попробуйте позже.",
+      code: "FEEDBACK_SEND_FAILED",
+    });
+  }
 });
 
 app.get("/api/prompts", (req, res) => {
@@ -2638,6 +2743,12 @@ app.listen(PORT, () => {
 
   console.log(
     `Laozhang cascade: GPT_MODEL=${GPT_MODEL} → LAOZHANG_GEMINI_MODEL=${LAOZHANG_GEMINI_MODEL || "—"} → LAOZHANG_ENTERPRISE_TOKEN=${LAOZHANG_ENTERPRISE_TOKEN ? "set" : "off"}`
+  );
+
+  console.log(
+    `Feedback: chatId=${FEEDBACK_CHAT_ID ? "set" : "missing"}, botToken=${
+      TELEGRAM_BOT_TOKEN ? "set" : "missing"
+    }`
   );
 
   console.log(`Backend started on port ${PORT}`);
