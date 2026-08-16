@@ -30,8 +30,8 @@ npm start
 ## 3) Важные .env поля
 
 - `FRONTEND_ORIGIN=https://nanobananaa.ru`
-- `FRONTEND_SUCCESS_REDIRECT=https://nanobananaa.ru/generate.html`
-- `FRONTEND_ERROR_REDIRECT=https://nanobananaa.ru/generate.html?auth_error=1`
+- `FRONTEND_SUCCESS_REDIRECT=https://nanobananaa.ru`
+- `FRONTEND_ERROR_REDIRECT=https://nanobananaa.ru?auth_error=1`
 - `COOKIE_DOMAIN=.nanobananaa.ru`
 - `COOKIE_SECURE=true`
 - `SUPABASE_USERS_TABLE=users`
@@ -56,6 +56,14 @@ npm start
 
 Порядок для `POST /api/generate-image`: при непустом промпте и заданном `OPENROUTER_API_KEY` — сначала проверка промпта; при `shouldBlock` запрос не доходит до Laozhang (**422** `PROMPT_BLOCKED`). Иначе каскад: (1) GPT Images, (2) Gemini с основным ключом, (3) тот же Gemini URL с enterprise-токеном. В ответе могут быть `fallbackTier`, `cascadeTotal`, `reconnectNotices`. Fallback env для моделей: `LAOZHANG_IMAGE_MODEL`, `LAOZHANG_GEMINI_MODEL_PATH`.
 
+- `SEEDANCE_API_KEY=` — ключ для видео (Seedance, laozhang); пусто — используется `LAOZHANG_API_KEY`
+- `SEEDANCE_API_BASE=https://api2.laozhang.ai/seedance/api/v3`
+- `SEEDANCE_MODEL=doubao-seedance-2-0-fast-260128`
+- `SEEDANCE_RESOLUTION=720p`
+- `SEEDANCE_RATIO=adaptive` — `16:9`/`4:3`/`1:1`/`3:4`/`9:16`/`21:9`/`adaptive`
+
+`POST /api/generate-video/start` создаёт задачу через `POST {SEEDANCE_API_BASE}/contents/generations/tasks` (image-to-video: текст промпта + `image_url` с `role: "reference_image"`), `GET /api/generate-video/status` опрашивает `GET {SEEDANCE_API_BASE}/contents/generations/tasks/{id}` пока `status` не станет `succeeded`/`completed` (видео — в `content.video_url`) или `failed`/`expired`. См. https://docs.laozhang.ai/en/api-capabilities/seedance2-video-generation
+
 - `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
 - `PAYMENT_PROVIDER_URL=https://app.platega.io/transaction/process`
 - `PAYMENT_PROVIDER_API_KEY=...`
@@ -66,14 +74,14 @@ npm start
 - `PAYMENT_PROVIDER_MERCHANT_HEADER=X-MerchantId`
 - `PAYMENT_PROVIDER_SECRET_HEADER=X-Secret`
 - `PAYMENT_METHOD=2`
-- `PAYMENT_RETURN_URL=https://nanobananaa.ru/generate.html`
+- `PAYMENT_RETURN_URL=https://nanobananaa.ru`
 - `PAYMENT_CURRENCY=RUB`
 - `PAYMENT_WEBHOOK_SECRET=...` (рекомендуется)
 - `PAYMENT_WEBHOOK_SECRET_HEADER=x-webhook-secret`
 
 ## 4) Что указывать в Telegram Widget
 
-В `pages/generate.html`:
+В `index.html`:
 
 ```html
 <script async src="https://telegram.org/js/telegram-widget.js?22"
@@ -114,7 +122,7 @@ npm start
 
 ## 7) Проверка после деплоя
 
-1. Открыть `https://nanobananaa.ru/generate.html`
+1. Открыть `https://nanobananaa.ru/`
 2. Нажать "Сгенерировать" -> открыть Telegram Login
 3. После входа должен быть редирект обратно на страницу
 4. Проверить `GET https://api.nanobananaa.ru/auth/me` (должен вернуть `authenticated: true`)
@@ -134,6 +142,6 @@ add column if not exists balance_free integer default 0;
 
 ## 9) Важно по безопасности
 
-- Не хранить `SUPABASE_SERVICE_ROLE_KEY` и `LAOZHANG_API_KEY` во фронте.
+- Не хранить `SUPABASE_SERVICE_ROLE_KEY`, `LAOZHANG_API_KEY` и `SEEDANCE_API_KEY` во фронте.
 - Использовать только HTTPS.
 - В проде лучше оставить `COOKIE_SECURE=true`.

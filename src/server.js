@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import https from "node:https";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
@@ -32,12 +33,11 @@ const ALLOWED_ORIGINS = normalizeEnv(
   .filter(Boolean);
 
 const FRONTEND_SUCCESS_REDIRECT =
-  normalizeEnv(process.env.FRONTEND_SUCCESS_REDIRECT) ||
-  `${FRONTEND_ORIGIN}/generate.html`;
+  normalizeEnv(process.env.FRONTEND_SUCCESS_REDIRECT) || FRONTEND_ORIGIN;
 
 const FRONTEND_ERROR_REDIRECT =
   normalizeEnv(process.env.FRONTEND_ERROR_REDIRECT) ||
-  `${FRONTEND_ORIGIN}/generate.html?auth_error=1`;
+  `${FRONTEND_ORIGIN}?auth_error=1`;
 
 const POST_AUTH_REDIRECT_COOKIE = "post_auth_redirect";
 
@@ -238,8 +238,7 @@ const PAYMENT_PROVIDER_KEY_HEADER = normalizeEnv(
 );
 const PAYMENT_METHOD = Number(process.env.PAYMENT_METHOD || 2);
 const PAYMENT_RETURN_URL =
-  normalizeEnv(process.env.PAYMENT_RETURN_URL) ||
-  `${FRONTEND_ORIGIN}/generate.html`;
+  normalizeEnv(process.env.PAYMENT_RETURN_URL) || FRONTEND_ORIGIN;
 const PAYMENT_CURRENCY = normalizeEnv(process.env.PAYMENT_CURRENCY, "RUB");
 const WEBHOOK_SECRET = normalizeEnv(process.env.PAYMENT_WEBHOOK_SECRET);
 const WEBHOOK_SECRET_HEADER = normalizeEnv(
@@ -250,8 +249,20 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
 const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
 const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
 
-const KIE_API_KEY = normalizeEnv(process.env.KIE_API_KEY);
-const KIE_API_BASE = normalizeEnv(process.env.KIE_API_BASE, "https://api.kie.ai");
+/** Seedance (laozhang) видео: см. https://docs.laozhang.ai/en/api-capabilities/seedance2-video-generation */
+const SEEDANCE_API_KEY = normalizeEnv(
+  process.env.SEEDANCE_API_KEY || process.env.LAOZHANG_API_KEY
+);
+const SEEDANCE_API_BASE = normalizeEnv(
+  process.env.SEEDANCE_API_BASE,
+  "https://api2.laozhang.ai/seedance/api/v3"
+);
+const SEEDANCE_MODEL = normalizeEnv(
+  process.env.SEEDANCE_MODEL,
+  "doubao-seedance-2-0-fast-260128"
+);
+const SEEDANCE_RESOLUTION = normalizeEnv(process.env.SEEDANCE_RESOLUTION, "720p");
+const SEEDANCE_RATIO = normalizeEnv(process.env.SEEDANCE_RATIO, "adaptive");
 const TMPFILES_UPLOAD_URL = normalizeEnv(
   process.env.TMPFILES_UPLOAD_URL,
   "https://tmpfiles.org/api/v1/upload"
@@ -432,21 +443,24 @@ function buildSuccessRedirectUrl(chatId) {
   return buildSuccessRedirectUrlWithOverride(chatId, null);
 }
 
+function isAllowedFrontendOrigin(origin) {
+  return ALLOWED_ORIGINS.includes(String(origin || "").replace(/\/$/, ""));
+}
+
 function normalizeFrontendRedirectTarget(value) {
   const raw = normalizeEnv(value);
   if (!raw) return null;
 
-  // Allow relative redirects like "/"
+  // Relative path like "/feedback.html"
   if (raw.startsWith("/")) {
     return raw;
   }
 
-  // Allow only URLs under FRONTEND_ORIGIN
+  // Absolute URL — only from ALLOWED_ORIGINS (local + prod)
   try {
-    const origin = new URL(FRONTEND_ORIGIN);
     const target = new URL(raw);
-    if (target.origin !== origin.origin) return null;
-    return target.pathname + target.search + target.hash;
+    if (!isAllowedFrontendOrigin(target.origin)) return null;
+    return `${target.origin}${target.pathname}${target.search}${target.hash}`;
   } catch {
     return null;
   }
@@ -454,10 +468,14 @@ function normalizeFrontendRedirectTarget(value) {
 
 function buildSuccessRedirectUrlWithOverride(chatId, redirectOverride) {
   const token = createSessionToken(chatId);
-  const baseRedirect = normalizeFrontendRedirectTarget(redirectOverride)
-    ? new URL(normalizeFrontendRedirectTarget(redirectOverride), FRONTEND_ORIGIN)
-        .toString()
-    : FRONTEND_SUCCESS_REDIRECT;
+  const normalized = normalizeFrontendRedirectTarget(redirectOverride);
+
+  let baseRedirect = FRONTEND_SUCCESS_REDIRECT;
+  if (normalized) {
+    baseRedirect = normalized.startsWith("/")
+      ? new URL(normalized, FRONTEND_ORIGIN).toString()
+      : normalized;
+  }
 
   if (!token) return baseRedirect;
 
@@ -467,9 +485,7 @@ function buildSuccessRedirectUrlWithOverride(chatId, redirectOverride) {
     return target.toString();
   } catch {
     const glue = baseRedirect.includes("?") ? "&" : "?";
-    return `${baseRedirect}${glue}session=${encodeURIComponent(
-      token
-    )}`;
+    return `${baseRedirect}${glue}session=${encodeURIComponent(token)}`;
   }
 }
 
@@ -898,30 +914,23 @@ function resolveVideoGenerationCost(sound, durationRaw) {
 }
 
 /**
- * Страница tmpfiles (HTML) -> URL прямой отдачи файла для image_urls (как в n8n).
- * replace('http://tmpfiles.org/', 'http://tmpfiles.org/dl/') — иначе по «прямой» ссылке не то, что нужно API.
+ * Страница tmpfiles (HTML) -> прямая ссылка на файл для image_urls.
+ * tmpfiles.org больше не отдаёт файл по /dl/<id>/<name> напрямую (302 -> HTML-страница):
+ * реальная прямая ссылка теперь содержит доп. токен (`/dl/<ts>.<hash>/<id>/<name>`),
+ * который есть только в HTML самой страницы файла — приходится её распарсить.
  */
-function toTmpfilesDlUrl(pageUrl) {
-  let s = String(pageUrl || "").trim();
+async function resolveTmpfilesDlUrl(pageUrl) {
+  const s = String(pageUrl || "").trim();
   if (!s) return "";
-  if (/\/dl\//i.test(s)) return s;
-
-  s = s.replace(/^http:\/\/tmpfiles\.org\//i, "http://tmpfiles.org/dl/");
-  s = s.replace(/^https:\/\/tmpfiles\.org\//i, "https://tmpfiles.org/dl/");
-  s = s.replace(/^http:\/\/www\.tmpfiles\.org\//i, "http://www.tmpfiles.org/dl/");
-  s = s.replace(
-    /^https:\/\/www\.tmpfiles\.org\//i,
-    "https://www.tmpfiles.org/dl/"
-  );
 
   try {
-    const u = new URL(s);
-    const host = u.hostname.replace(/^www\./i, "");
-    if (host !== "tmpfiles.org") return s;
-    if (u.pathname.startsWith("/dl/")) return s;
-    return `${u.origin}/dl${u.pathname}`;
+    const res = await fetch(s);
+    if (!res.ok) return "";
+    const html = await res.text();
+    const match = html.match(/href="(https?:\/\/tmpfiles\.org\/dl\/[^"]+)"/i);
+    return match ? match[1] : "";
   } catch {
-    return s;
+    return "";
   }
 }
 
@@ -959,60 +968,97 @@ async function uploadBufferToTmpfiles(buffer, filename, mimeType) {
   return { ok: true, pageUrl: String(pageUrl) };
 }
 
-function extractKieTaskId(payload) {
-  const inner = payload?.data ?? payload;
-  return String(inner?.taskId || inner?.task_id || payload?.taskId || "").trim();
+function extractSeedanceTaskId(payload) {
+  return String(payload?.id || payload?.task_id || payload?.taskId || "").trim();
 }
 
-function extractKieRecordInner(payload) {
-  return payload?.data ?? payload;
+function extractVideoUrlFromSeedanceRecord(record) {
+  return String(
+    record?.content?.video_url ||
+      record?.result_url ||
+      record?.data?.content?.video_url ||
+      ""
+  ).trim();
 }
 
-function extractVideoUrlFromKieRecord(record) {
-  const resultJsonStr = record?.resultJson ?? record?.result_json;
-  if (typeof resultJsonStr === "string" && resultJsonStr.trim()) {
-    try {
-      const parsed = JSON.parse(resultJsonStr);
-      const urls = parsed?.resultUrls || parsed?.result_urls;
-      if (Array.isArray(urls) && urls[0]) return String(urls[0]).trim();
-      if (typeof parsed?.url === "string") return parsed.url.trim();
-    } catch {
-      /* ignore */
-    }
-  }
-  return "";
-}
-
-function normalizeKieJobState(stateRaw) {
+function normalizeSeedanceState(stateRaw) {
   return String(stateRaw || "")
     .trim()
     .toLowerCase();
 }
 
-function isKiePendingState(state) {
-  return ["waiting", "queuing", "queuning", "generating", "pending", "processing"].includes(
-    state
+function isSeedancePendingState(state) {
+  return ["queued", "running"].includes(state);
+}
+
+function isSeedanceFailedState(state) {
+  return ["failed", "expired"].includes(state);
+}
+
+function isSeedanceSuccessState(state) {
+  return ["succeeded", "completed"].includes(state);
+}
+
+/**
+ * Node fetch() (undici) обрывает соединение на середине ответа именно с этим
+ * апстримом (SocketError "other side closed", 392-393 байта и тишина) —
+ * воспроизводится стабильно, при этом classic `https`-модуль и curl читают
+ * тот же ответ без проблем. Поэтому здесь — сырой https.request вместо fetch.
+ */
+function seedanceFetchJson(pathname, init = {}) {
+  const base = new URL(SEEDANCE_API_BASE);
+  const target = pathname.startsWith("http")
+    ? new URL(pathname)
+    : new URL(`${base.pathname.replace(/\/$/, "")}${pathname}`, base);
+
+  const headers = { ...(init.headers || {}) };
+  const hasAuthHeader = Object.keys(headers).some(
+    (key) => key.toLowerCase() === "authorization"
   );
-}
-
-function isKieFailedState(state) {
-  return ["fail", "failed", "error"].includes(state);
-}
-
-function isKieSuccessState(state) {
-  return ["success", "succeeded", "completed"].includes(state);
-}
-
-async function kieFetchJson(pathname, init = {}) {
-  const base = KIE_API_BASE.replace(/\/$/, "");
-  const url = pathname.startsWith("http") ? pathname : `${base}${pathname}`;
-  const headers = new Headers(init.headers || {});
-  if (!headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${KIE_API_KEY}`);
+  if (!hasAuthHeader) {
+    headers["Authorization"] = `Bearer ${SEEDANCE_API_KEY}`;
   }
-  const response = await fetch(url, { ...init, headers });
-  const raw = await response.json().catch(() => ({}));
-  return { response, raw };
+
+  const body = typeof init.body === "string" ? init.body : undefined;
+  if (body) headers["Content-Length"] = Buffer.byteLength(body);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: target.hostname,
+        path: `${target.pathname}${target.search}`,
+        method: init.method || "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          let raw = {};
+          try {
+            raw = text ? JSON.parse(text) : {};
+          } catch {
+            console.error("Seedance response is not valid JSON.", {
+              status: res.statusCode,
+              bodyPreview: text.slice(0, 500),
+            });
+          }
+          resolve({
+            response: {
+              ok: Number(res.statusCode) >= 200 && Number(res.statusCode) < 300,
+              status: res.statusCode,
+            },
+            raw,
+          });
+        });
+        res.on("error", reject);
+      }
+    );
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
 }
 
 function pruneVideoJobMaps() {
@@ -2360,8 +2406,8 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
 app.post("/api/generate-video/start", requireChatId, async (req, res) => {
   try {
-    if (!KIE_API_KEY) {
-      return res.status(500).json({ error: "KIE_API_KEY не настроен" });
+    if (!SEEDANCE_API_KEY) {
+      return res.status(500).json({ error: "SEEDANCE_API_KEY не настроен" });
     }
 
     let user = await getUserByChatId(req.chatId);
@@ -2431,38 +2477,50 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
       });
     }
 
-    const imageUrl = toTmpfilesDlUrl(upload.pageUrl);
+    const imageUrl = await resolveTmpfilesDlUrl(upload.pageUrl);
+    if (!imageUrl) {
+      return res.status(502).json({
+        error: "Не удалось получить прямую ссылку на изображение.",
+        code: "TMPFILES_RESOLVE_FAILED",
+      });
+    }
 
-    const { response: kieRes, raw: kieRaw } = await kieFetchJson(
-      "/api/v1/jobs/createTask",
+    const { response: seedanceRes, raw: seedanceRaw } = await seedanceFetchJson(
+      "/contents/generations/tasks",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "kling-2.6/image-to-video",
-          input: {
-            prompt: promptText,
-            image_urls: [imageUrl],
-            sound,
-            duration,
-          },
+          model: SEEDANCE_MODEL,
+          content: [
+            { type: "text", text: promptText },
+            {
+              type: "image_url",
+              image_url: { url: imageUrl },
+              role: "reference_image",
+            },
+          ],
+          ratio: SEEDANCE_RATIO,
+          duration: Number(duration),
+          resolution: SEEDANCE_RESOLUTION,
+          generate_audio: sound,
         }),
       }
     );
 
-    const taskId = extractKieTaskId(kieRaw);
-    const kieHttpOk = kieRes.ok;
-    const kieCodeOk = Number(kieRaw?.code) === 200;
+    const taskId = extractSeedanceTaskId(seedanceRaw);
 
-    if (!kieHttpOk || !kieCodeOk || !taskId) {
+    if (!seedanceRes.ok || !taskId) {
       const msg =
-        typeof kieRaw?.msg === "string" && kieRaw.msg.trim()
-          ? kieRaw.msg
-          : "Не удалось создать задачу видео.";
+        typeof seedanceRaw?.error?.message === "string" && seedanceRaw.error.message.trim()
+          ? seedanceRaw.error.message
+          : typeof seedanceRaw?.message === "string" && seedanceRaw.message.trim()
+            ? seedanceRaw.message
+            : "Не удалось создать задачу видео.";
       return res.status(502).json({
         error: msg,
-        code: "KIE_CREATE_FAILED",
-        raw: kieRaw,
+        code: "SEEDANCE_CREATE_FAILED",
+        raw: seedanceRaw,
       });
     }
 
@@ -2486,8 +2544,8 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
 
 app.get("/api/generate-video/status", requireChatId, async (req, res) => {
   try {
-    if (!KIE_API_KEY) {
-      return res.status(500).json({ error: "KIE_API_KEY не настроен" });
+    if (!SEEDANCE_API_KEY) {
+      return res.status(500).json({ error: "SEEDANCE_API_KEY не настроен" });
     }
 
     const taskId = String(req.query?.taskId || "").trim();
@@ -2511,51 +2569,53 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
       });
     }
 
-    const { response: kieRes, raw: kieRaw } = await kieFetchJson(
-      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
+    const { response: seedanceRes, raw: seedanceRaw } = await seedanceFetchJson(
+      `/contents/generations/tasks/${encodeURIComponent(taskId)}`,
       { method: "GET" }
     );
 
-    const inner = extractKieRecordInner(kieRaw);
-    const state = normalizeKieJobState(inner?.state);
+    const state = normalizeSeedanceState(seedanceRaw?.status);
 
-    if (!kieRes.ok) {
+    if (!seedanceRes.ok) {
       return res.status(502).json({
-        error: typeof kieRaw?.msg === "string" ? kieRaw.msg : "Ошибка KIE API",
-        code: "KIE_STATUS_HTTP",
+        error:
+          typeof seedanceRaw?.error?.message === "string"
+            ? seedanceRaw.error.message
+            : "Ошибка Seedance API",
+        code: "SEEDANCE_STATUS_HTTP",
       });
     }
 
-    if (isKiePendingState(state)) {
+    if (isSeedancePendingState(state)) {
       return res.json({
         state: "pending",
-        kieState: inner?.state || state,
+        seedanceState: seedanceRaw?.status || state,
       });
     }
 
-    if (isKieFailedState(state)) {
+    if (isSeedanceFailedState(state)) {
       videoJobMetaByTaskId.delete(taskId);
       return res.json({
         state: "failed",
         error:
-          String(inner?.failMsg || inner?.fail_msg || "").trim() ||
+          String(seedanceRaw?.error?.message || "").trim() ||
           "Генерация видео не удалась.",
-        failCode: inner?.failCode || inner?.fail_code || "",
+        failCode: seedanceRaw?.error?.code || "",
       });
     }
 
-    if (!isKieSuccessState(state)) {
+    if (!isSeedanceSuccessState(state)) {
       return res.json({
         state: "pending",
-        kieState: inner?.state || state,
+        seedanceState: seedanceRaw?.status || state,
       });
     }
 
-    const videoUrl = extractVideoUrlFromKieRecord(inner);
+    const videoUrl = extractVideoUrlFromSeedanceRecord(seedanceRaw);
     if (!videoUrl) {
       return res.status(502).json({
         error: "Сервис не вернул ссылку на видео.",
-        code: "KIE_NO_VIDEO_URL",
+        code: "SEEDANCE_NO_VIDEO_URL",
       });
     }
 
@@ -2718,7 +2778,12 @@ app.get("/", (_req, res) => {
 </html>`);
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
+  const addr = server.address();
+  if (!server.listening || !addr) {
+    return;
+  }
+
   console.log(
     `Config: table=${SUPABASE_USERS_TABLE}, chatColumn=${SUPABASE_CHAT_ID_COLUMN}, versionColumn=${SUPABASE_VERSION_COLUMN}, pricesTable=${SUPABASE_PRICES_TABLE}, pricesFreeTable=${SUPABASE_PRICES_FREE_TABLE}, origins=${ALLOWED_ORIGINS.join(
       ","
@@ -2738,7 +2803,7 @@ app.listen(PORT, () => {
   );
 
   console.log(
-    `KIE video: apiKey=${KIE_API_KEY ? "set" : "missing"}, base=${KIE_API_BASE}`
+    `Seedance video: apiKey=${SEEDANCE_API_KEY ? "set" : "missing"}, base=${SEEDANCE_API_BASE}, model=${SEEDANCE_MODEL}`
   );
 
   console.log(
@@ -2752,4 +2817,15 @@ app.listen(PORT, () => {
   );
 
   console.log(`Backend started on port ${PORT}`);
+});
+
+server.on("error", (err) => {
+  if (err?.code === "EADDRINUSE") {
+    console.error(
+      `Port ${PORT} is already in use. Stop the other process or set PORT in .env`
+    );
+  } else {
+    console.error("Server listen error:", err);
+  }
+  process.exit(1);
 });
