@@ -538,6 +538,94 @@ async function createUserIfMissing(chatId) {
   return data;
 }
 
+const BALANCE_CAS_MAX_ATTEMPTS = 6;
+
+/**
+ * Атомарно списывает `cost` с баланса через compare-and-swap (UPDATE ... WHERE
+ * balanceColumn = <прочитанное значение>) с ретраями при конфликте.
+ * Без этого при параллельных запросах все они читают один и тот же баланс,
+ * все проходят проверку "хватает ли" и все списывают независимо — баланс
+ * может улететь в минус, а провайдер уже реально оплачен за каждую генерацию.
+ * extraFields — доп. поля, которые нужно проставить вместе со списанием (напр. version).
+ */
+async function reserveBalance(chatId, balanceColumn, cost, extraFields = {}) {
+  if (!supabase) return { ok: true, balance: null };
+
+  let known = null;
+  for (let attempt = 0; attempt < BALANCE_CAS_MAX_ATTEMPTS; attempt++) {
+    if (known == null) {
+      const user = await getUserByChatId(chatId);
+      const raw = Number(user?.[balanceColumn]);
+      known = Number.isFinite(raw) ? raw : 0;
+    }
+
+    if (known < cost) {
+      return { ok: false, balance: known };
+    }
+
+    const next = known - cost;
+    const { data, error } = await supabase
+      .from(SUPABASE_USERS_TABLE)
+      .update({ [balanceColumn]: next, ...extraFields })
+      .eq(SUPABASE_CHAT_ID_COLUMN, chatId)
+      .eq(balanceColumn, known)
+      .select(balanceColumn);
+
+    if (error) throw error;
+
+    if (Array.isArray(data) && data.length > 0) {
+      return { ok: true, balance: next };
+    }
+
+    // Кто-то параллельно уже изменил баланс — перечитываем и пробуем снова.
+    known = null;
+  }
+
+  console.error("reserveBalance: CAS conflict exceeded retries", {
+    chatId,
+    balanceColumn,
+    cost,
+  });
+  return { ok: false, balance: known ?? 0 };
+}
+
+/** Возврат ранее списанного `cost` (напр. при неудачной генерации). Тоже CAS. */
+async function refundBalance(chatId, balanceColumn, cost) {
+  if (!supabase || cost <= 0) return null;
+
+  let known = null;
+  for (let attempt = 0; attempt < BALANCE_CAS_MAX_ATTEMPTS; attempt++) {
+    if (known == null) {
+      const user = await getUserByChatId(chatId);
+      const raw = Number(user?.[balanceColumn]);
+      known = Number.isFinite(raw) ? raw : 0;
+    }
+
+    const next = known + cost;
+    const { data, error } = await supabase
+      .from(SUPABASE_USERS_TABLE)
+      .update({ [balanceColumn]: next })
+      .eq(SUPABASE_CHAT_ID_COLUMN, chatId)
+      .eq(balanceColumn, known)
+      .select(balanceColumn);
+
+    if (error) throw error;
+
+    if (Array.isArray(data) && data.length > 0) {
+      return next;
+    }
+
+    known = null;
+  }
+
+  console.error("refundBalance: CAS conflict exceeded retries — manual fix needed", {
+    chatId,
+    balanceColumn,
+    cost,
+  });
+  return null;
+}
+
 async function getPricingPlanById(planId, tableName = SUPABASE_PRICES_TABLE) {
   if (!supabase) return null;
 
@@ -1726,6 +1814,8 @@ app.post("/api/webhooks/platega", async (req, res) => {
 });
 
 app.post("/api/generate-image", requireChatId, async (req, res) => {
+  /** Если оплата зарезервирована, но упадём с исключением ниже — вернуть деньги в catch. */
+  let pendingRefund = null;
   try {
     if (!LAOZHANG_API_KEY) {
       return res.status(500).json({ error: "LAOZHANG_API_KEY не настроен" });
@@ -2312,6 +2402,23 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
+    const reservation = await reserveBalance(
+      req.chatId,
+      versionCfg.balanceColumn,
+      requestedCount,
+      { [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage }
+    );
+    if (!reservation.ok) {
+      return res.status(402).json({
+        error: "Недостаточно генераций. Пополните баланс.",
+        code: "INSUFFICIENT_BALANCE",
+        balance: reservation.balance,
+        required: requestedCount,
+      });
+    }
+    let nextBalance = reservation.balance;
+    pendingRefund = { column: versionCfg.balanceColumn, amount: requestedCount };
+
     const cascadeTotal = tierDefs.length;
     const reconnectNotices = [];
     let fallbackTierUsed = 0;
@@ -2335,6 +2442,13 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     if (!generatedImages.length) {
+      const refunded = await refundBalance(
+        req.chatId,
+        versionCfg.balanceColumn,
+        requestedCount
+      );
+      if (refunded != null) nextBalance = refunded;
+
       generationErrors.push(lastError);
       const msg = String(lastError?.message || "");
       const safetyRejected =
@@ -2347,6 +2461,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
             "Запрос отклонён модерацией провайдера. Смените формулировку или другое фото.",
           code: "GENERATION_SAFETY",
           details: generationErrors,
+          balance: nextBalance,
         });
       }
       const socketLikeFailure =
@@ -2358,29 +2473,23 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           : "Ошибка генерации, попробуйте еще раз через 10 секунд",
         code: "GENERATION_FAILED_ALL",
         details: generationErrors,
+        balance: nextBalance,
       });
     }
 
-    let nextBalance = null;
     const chargedCount = generatedImages.length;
 
-    if (supabase) {
-      nextBalance = Math.max(0, currentBalance - chargedCount);
-
-      const { error: updateError } = await supabase
-        .from(SUPABASE_USERS_TABLE)
-        .update({
-          [versionCfg.balanceColumn]: nextBalance,
-          [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage,
-        })
-        .eq(SUPABASE_CHAT_ID_COLUMN, req.chatId);
-
-      if (updateError) {
-        console.error("balance update error", updateError);
-        nextBalance = currentBalance;
-      }
+    // Зарезервировали requestedCount, но реально сгенерировалось меньше — вернём разницу.
+    if (chargedCount < requestedCount) {
+      const refunded = await refundBalance(
+        req.chatId,
+        versionCfg.balanceColumn,
+        requestedCount - chargedCount
+      );
+      if (refunded != null) nextBalance = refunded;
     }
 
+    pendingRefund = null;
     return res.json({
       imageData: generatedImages[0].imageData,
       images: generatedImages.map((item) => ({
@@ -2400,6 +2509,20 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     });
   } catch (error) {
     console.error("generate error", error);
+    if (pendingRefund) {
+      try {
+        await refundBalance(
+          req.chatId,
+          pendingRefund.column,
+          pendingRefund.amount
+        );
+      } catch (refundError) {
+        console.error(
+          "generate error: refund after exception also failed",
+          refundError
+        );
+      }
+    }
     return res.status(500).json({ error: "Внутренняя ошибка сервера" });
   }
 });
@@ -2628,34 +2751,24 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
     }
 
     const versionCfg = resolveVersionConfig(meta.versionRuntime);
-    const rawBalance = Number(user?.[versionCfg.balanceColumn]);
-    const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
 
-    if (currentBalance < meta.cost) {
+    // CAS вместо read-then-write: несколько параллельных опросов статуса одной
+    // и той же задачи (или разных задач) не должны списать баланс дважды/в минус.
+    const reservation = await reserveBalance(
+      req.chatId,
+      versionCfg.balanceColumn,
+      meta.cost,
+      { [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage }
+    );
+    if (!reservation.ok) {
       return res.status(402).json({
         error: "Недостаточно генераций на момент завершения.",
         code: "INSUFFICIENT_BALANCE",
-        balance: currentBalance,
+        balance: reservation.balance,
         required: meta.cost,
       });
     }
-
-    let nextBalance = currentBalance;
-    if (supabase) {
-      nextBalance = Math.max(0, currentBalance - meta.cost);
-      const { error: updateError } = await supabase
-        .from(SUPABASE_USERS_TABLE)
-        .update({
-          [versionCfg.balanceColumn]: nextBalance,
-          [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage,
-        })
-        .eq(SUPABASE_CHAT_ID_COLUMN, req.chatId);
-
-      if (updateError) {
-        console.error("video balance update error", updateError);
-        nextBalance = currentBalance;
-      }
-    }
+    const nextBalance = reservation.balance;
 
     emitSseEvent(req.chatId, "balance_update", {
       type: "balance_update",
