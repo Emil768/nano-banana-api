@@ -184,7 +184,7 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
 /** Шаг 1 каскада: имя модели GPT Images (Laozhang). Env `GPT_MODEL`; fallback `LAOZHANG_IMAGE_MODEL`. */
 const GPT_MODEL = normalizeEnv(
   process.env.GPT_MODEL || process.env.LAOZHANG_IMAGE_MODEL,
-  "gpt-image-2-vip"
+  "gpt-image-2.5-flare-vip"
 );
 
 /** Шаг 2: Gemini `generateContent` — путь на хосте или полный URL. Env `LAOZHANG_GEMINI_MODEL`; fallback `LAOZHANG_GEMINI_MODEL_PATH`. */
@@ -1934,6 +1934,12 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
+    const transparentBackground = req.body?.transparentBackground === true;
+    // JPEG без альфа-канала: с background=transparent API вернёт ошибку, поэтому всегда PNG.
+    const imageOutputParams = transparentBackground
+      ? { background: "transparent", output_format: "png" }
+      : {};
+
     const buildOpenAiStyleJsonBody = () => {
       const prompt = extractPromptText(upstreamPayloadBase);
       const body = {
@@ -1941,6 +1947,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         prompt,
         n: Math.max(1, requestedCount),
         response_format: "b64_json",
+        ...imageOutputParams,
       };
 
       return body;
@@ -2082,6 +2089,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
               index === 0 ? `source.${ext}` : `source${index}.${ext}`
             );
           });
+
+          for (const [key, value] of Object.entries(imageOutputParams)) {
+            form.append(key, value);
+          }
 
           const multipartHeaders = new Headers();
           if (headers.Authorization)
@@ -2390,12 +2401,13 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         run: () => runLaozhangAttempt(candidateUrl, LAOZHANG_API_KEY, 1),
       });
     }
-    if (geminiFullUrl) {
+    // Gemini не умеет прозрачный фон — вместо PNG с альфой молча вернул бы обычную картинку.
+    if (geminiFullUrl && !transparentBackground) {
       tierDefs.push({
         run: () => runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 2),
       });
     }
-    if (geminiFullUrl && LAOZHANG_ENTERPRISE_TOKEN) {
+    if (geminiFullUrl && LAOZHANG_ENTERPRISE_TOKEN && !transparentBackground) {
       tierDefs.push({
         run: () =>
           runGeminiAttempt(geminiFullUrl, LAOZHANG_ENTERPRISE_TOKEN, 3),

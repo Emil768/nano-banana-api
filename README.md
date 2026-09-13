@@ -50,11 +50,11 @@ npm start
 - `OPENROUTER_MODEL=` — модель на OpenRouter (обязательно, если задан ключ), например `google/gemini-2.0-flash-001`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
 - `LAOZHANG_URL=https://api.laozhang.ai/v1/images/generations` — полный URL шага 1 (GPT Images); хост из того же значения используется для относительного `LAOZHANG_GEMINI_MODEL`. Устаревший вариант: только путь в `LAOZHANG_URL` + отдельный хост в `LAOZHANG_URL_1`
-- `GPT_MODEL=gpt-image-2-vip` — модель для шага 1 (Images API)
+- `GPT_MODEL=gpt-image-2.5-flare-vip` — модель для шага 1 (Images API)
 - `LAOZHANG_GEMINI_MODEL=/v1beta/models/…:generateContent` — шаг 2 (Gemini): путь на том же хосте или полный URL
 - `LAOZHANG_ENTERPRISE_TOKEN=` — опционально шаг 3: тот же Gemini endpoint (`LAOZHANG_GEMINI_MODEL`), но запрос с этим ключом вместо `LAOZHANG_API_KEY`; пусто — третий шаг отключён
 
-Порядок для `POST /api/generate-image`: при непустом промпте и заданном `OPENROUTER_API_KEY` — сначала проверка промпта; при `shouldBlock` запрос не доходит до Laozhang (**422** `PROMPT_BLOCKED`). Иначе каскад: (1) GPT Images, (2) Gemini с основным ключом, (3) тот же Gemini URL с enterprise-токеном. В ответе могут быть `fallbackTier`, `cascadeTotal`, `reconnectNotices`. Fallback env для моделей: `LAOZHANG_IMAGE_MODEL`, `LAOZHANG_GEMINI_MODEL_PATH`.
+Порядок для `POST /api/generate-image`: при непустом промпте и заданном `OPENROUTER_API_KEY` — сначала проверка промпта; при `shouldBlock` запрос не доходит до Laozhang (**422** `PROMPT_BLOCKED`). Иначе каскад: (1) GPT Images, (2) Gemini с основным ключом, (3) тот же Gemini URL с enterprise-токеном. В ответе могут быть `fallbackTier`, `cascadeTotal`, `reconnectNotices`. При `"transparentBackground": true` в теле запроса к GPT Images добавляются `background: "transparent"` и `output_format: "png"`, а шаги Gemini пропускаются (прозрачный фон они не поддерживают). Fallback env для моделей: `LAOZHANG_IMAGE_MODEL`, `LAOZHANG_GEMINI_MODEL_PATH`.
 
 - `SEEDANCE_API_KEY=` — ключ для видео (Seedance, laozhang); пусто — используется `LAOZHANG_API_KEY`
 - `SEEDANCE_API_BASE=https://api2.laozhang.ai/seedance/api/v3`
