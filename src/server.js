@@ -112,10 +112,24 @@ const SUPABASE_PRICE_AMOUNT_COLUMN = normalizeEnv(
   process.env.SUPABASE_PRICE_AMOUNT_COLUMN,
   "price_rub"
 );
+/** Пакеты с `true` в этой колонке промокод не удешевляет. */
+const SUPABASE_PRICE_PROMO_EXCLUDED_COLUMN = normalizeEnv(
+  process.env.SUPABASE_PRICE_PROMO_EXCLUDED_COLUMN,
+  "promo_excluded"
+);
 const SUPABASE_VERSION_COLUMN = normalizeEnv(
   process.env.SUPABASE_VERSION_COLUMN,
   "version"
 );
+const SUPABASE_PROMO_TABLE = normalizeEnv(
+  process.env.SUPABASE_PROMO_TABLE,
+  "promo_codes"
+);
+/**
+ * Тип промокода — только метка канала: пилюлей на сайте светится `web`,
+ * но ввести руками и применить можно любой живой код (`web`, `bot`, `partner`).
+ */
+const PROMO_SITE_TYPE = "web";
 const AUTO_CREATE_USER =
   String(process.env.AUTO_CREATE_USER || "true") === "true";
 
@@ -657,16 +671,128 @@ function mapPlanForFrontend(plan) {
     name: plan?.[SUPABASE_PRICE_NAME_COLUMN],
     generations: Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0),
     price_rub: Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0),
+    promo_excluded: isPlanPromoExcluded(plan),
+  };
+}
+
+/** Колонки может не быть (старая база) — тогда скидка действует как обычно. */
+function isPlanPromoExcluded(plan) {
+  return plan?.[SUPABASE_PRICE_PROMO_EXCLUDED_COLUMN] === true;
+}
+
+function normalizePromoCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase();
+}
+
+/** Код живой, если текущий момент внутри окна (границы необязательны). */
+function isPromoLive(promo, now = Date.now()) {
+  if (!promo) return false;
+
+  const startsAt = promo.starts_at ? Date.parse(promo.starts_at) : null;
+  const endsAt = promo.ends_at ? Date.parse(promo.ends_at) : null;
+
+  if (Number.isFinite(startsAt) && now < startsAt) return false;
+  if (Number.isFinite(endsAt) && now >= endsAt) return false;
+
+  return true;
+}
+
+function mapPromoForFrontend(promo) {
+  return {
+    code: normalizePromoCode(promo?.code),
+    title: promo?.title || "",
+    percent: Number(promo?.percent || 0),
+    type: String(promo?.type || PROMO_SITE_TYPE),
+    endsAt: promo?.ends_at || null,
   };
 }
 
 /**
- * Разбор payload платежа: `${chatId}-${planId}`.
+ * Итоговая цена со скидкой. Тот же расчёт повторён на фронте
+ * (`applyPromoDiscount` в assets/js/index.js) — держать формулы одинаковыми,
+ * иначе показанная сумма разойдётся с той, что уходит провайдеру.
+ */
+function applyPromoDiscount(amount, percent) {
+  const base = Number(amount || 0);
+  const off = Number(percent || 0);
+
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  if (!Number.isFinite(off) || off <= 0) return base;
+
+  return Math.max(1, Math.round((base * (100 - Math.min(off, 100))) / 100));
+}
+
+async function getPromoByCode(code) {
+  if (!supabase) return null;
+
+  const normalized = normalizePromoCode(code);
+  if (!normalized) return null;
+
+  const { data, error } = await supabase
+    .from(SUPABASE_PROMO_TABLE)
+    .select("*")
+    .ilike("code", normalized)
+    .limit(1);
+
+  if (error) throw error;
+
+  const promo = Array.isArray(data) ? data[0] : null;
+  return promo && normalizePromoCode(promo.code) === normalized ? promo : null;
+}
+
+/** Активный код для пилюли на сайте: только `web`, ближайший по окончанию. */
+async function getActiveSitePromo() {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from(SUPABASE_PROMO_TABLE)
+    .select("*")
+    .eq("type", PROMO_SITE_TYPE)
+    .order("ends_at", { ascending: true, nullsFirst: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.find((promo) => isPromoLive(promo)) || null;
+}
+
+/**
+ * Проверка кода перед применением на сайте. Тип не ограничивает: любой живой
+ * код проходит, где бы его ни раздали.
+ * Возвращает `{ promo }` либо `{ reason }` — причину отказа.
+ */
+async function resolvePromoForSite(code) {
+  const normalized = normalizePromoCode(code);
+  if (!normalized) return { reason: "empty" };
+
+  const promo = await getPromoByCode(normalized);
+  if (!promo) return { reason: "not_found" };
+  if (!isPromoLive(promo)) return { reason: "expired" };
+
+  return { promo };
+}
+
+/**
+ * Разбор payload платежа: `${chatId}-${planId}` либо `${chatId}-${planId}-p${percent}`
+ * при оплате с промокодом. Суффикс необязателен — платежи, созданные до промокодов,
+ * разбираются по-старому.
  * И user id, и id тарифа в БД — строки (Telegram: цифры, Google: `g…`, тариф: число или uuid).
  */
 function parseWebhookPayload(payloadValue) {
-  const raw = String(payloadValue || "").trim();
+  let raw = String(payloadValue || "").trim();
   if (!raw) return null;
+
+  let discountPercent = 0;
+
+  const tailDash = raw.lastIndexOf("-");
+  const tail = tailDash > 0 ? raw.slice(tailDash + 1) : "";
+  if (/^p\d{1,3}$/.test(tail)) {
+    discountPercent = Number(tail.slice(1));
+    raw = raw.slice(0, tailDash);
+  }
 
   const lastDash = raw.lastIndexOf("-");
   if (lastDash <= 0) return null;
@@ -681,6 +807,7 @@ function parseWebhookPayload(payloadValue) {
   return {
     chatId,
     planId,
+    discountPercent,
   };
 }
 
@@ -1603,6 +1730,37 @@ app.get("/api/pricing", requireChatId, async (req, res) => {
   }
 });
 
+/** Активный код для пилюли под кнопкой «Создать». Без авторизации: показываем всем. */
+app.get("/api/promo/active", async (_req, res) => {
+  try {
+    if (!supabase) return res.json({ promo: null });
+
+    const promo = await getActiveSitePromo();
+    return res.json({ promo: promo ? mapPromoForFrontend(promo) : null });
+  } catch (error) {
+    console.error("promo/active error", error);
+    return res.json({ promo: null });
+  }
+});
+
+app.post("/api/promo/validate", requireChatId, async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(500).json({ error: "Supabase не настроен" });
+    }
+
+    const { promo, reason } = await resolvePromoForSite(req.body?.code);
+    if (!promo) {
+      return res.json({ valid: false, reason });
+    }
+
+    return res.json({ valid: true, promo: mapPromoForFrontend(promo) });
+  } catch (error) {
+    console.error("promo/validate error", error);
+    return res.status(500).json({ error: "Не удалось проверить промокод" });
+  }
+});
+
 app.post("/api/payments/create", requireChatId, async (req, res) => {
   try {
     if (!supabase) {
@@ -1635,14 +1793,34 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       return res.status(400).json({ error: "Некорректная сумма тарифа" });
     }
 
-    const payload = `${req.chatId}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
+    // Скидку считает бэк: сумма с фронта не принимается вообще.
+    let promo = null;
+    if (normalizePromoCode(req.body?.promoCode)) {
+      const resolved = await resolvePromoForSite(req.body.promoCode);
+      if (!resolved.promo) {
+        return res.status(400).json({
+          error: "Промокод недействителен",
+          reason: resolved.reason,
+        });
+      }
+      promo = resolved.promo;
+    }
+
+    // Помеченный пакет скидку не получает, даже если промокод верный.
+    const discountPercent =
+      promo && !isPlanPromoExcluded(plan) ? Number(promo.percent || 0) : 0;
+    const finalAmount = applyPromoDiscount(amount, discountPercent);
+
+    const payload = discountPercent
+      ? `${req.chatId}-${plan[SUPABASE_PRICE_ID_COLUMN]}-p${discountPercent}`
+      : `${req.chatId}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
     const providerRequestBody = {
       paymentMethod: PAYMENT_METHOD,
       description: `Оплата ${generations} генераций (${versionCfg.versionRuntime.toUpperCase()}) для юзера ${
         req.chatId
-      }`,
+      }${promo ? ` по промокоду ${promo.code} (−${discountPercent}%)` : ""}`,
       paymentDetails: {
-        amount,
+        amount: finalAmount,
         currency: PAYMENT_CURRENCY,
       },
       return: PAYMENT_RETURN_URL,
@@ -1690,6 +1868,10 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       paymentUrl,
       raw,
       version: versionCfg.versionRuntime,
+      amount: finalAmount,
+      basePrice: amount,
+      promoCode: promo ? normalizePromoCode(promo.code) : null,
+      discountPercent,
     });
   } catch (error) {
     console.error("payments/create error", error);
@@ -1722,7 +1904,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.status(400).json({ error: "invalid payload format" });
     }
 
-    const { chatId, planId } = parsed;
+    const { chatId, planId, discountPercent } = parsed;
 
     if (status === "pending") {
       emitSseEvent(chatId, "payment_pending", {
@@ -1767,7 +1949,11 @@ app.post("/api/webhooks/platega", async (req, res) => {
     }
 
     const generations = Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0);
-    const priceRub = Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0);
+    // Генерации выдаём полностью, в total_sum пишем реально оплаченное.
+    const priceRub = applyPromoDiscount(
+      Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0),
+      discountPercent
+    );
     const currentBalance = Number(user?.[versionCfg.balanceColumn] || 0);
     const currentTotalSum = Number(user?.[SUPABASE_TOTAL_SUM_COLUMN] || 0);
 

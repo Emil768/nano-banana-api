@@ -46,6 +46,7 @@ npm start
 - `SUPABASE_PRICE_GENERATIONS_COLUMN=generations`
 - `SUPABASE_PRICE_AMOUNT_COLUMN=price_rub`
 - `SUPABASE_VERSION_COLUMN=version`
+- `SUPABASE_PROMO_TABLE=promo_codes` — таблица промокодов (схема: `sql/promo_codes.sql`)
 - `OPENROUTER_API_KEY=` — если задан, перед каскадом Laozhang промпт проверяется через OpenRouter (18+ и т.п.); пусто — проверка отключена
 - `OPENROUTER_MODEL=` — модель на OpenRouter (обязательно, если задан ключ), например `google/gemini-2.0-flash-001`
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
