@@ -5,8 +5,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
+import { registerDescribeRoutes } from "./describe.js";
 
-import promptsLibrary from "./prompts.json" with { type: "json" };
 
 dotenv.config();
 
@@ -79,10 +79,6 @@ const SUPABASE_BALANCE_COLUMN = normalizeEnv(
   process.env.SUPABASE_BALANCE_COLUMN,
   "balance"
 );
-const SUPABASE_BALANCE_FREE_COLUMN = normalizeEnv(
-  process.env.SUPABASE_BALANCE_FREE_COLUMN,
-  "balance_free"
-);
 const SUPABASE_SOURCE_COLUMN = normalizeEnv(process.env.SUPABASE_SOURCE_COLUMN);
 const SUPABASE_TOTAL_SUM_COLUMN = normalizeEnv(
   process.env.SUPABASE_TOTAL_SUM_COLUMN,
@@ -91,10 +87,6 @@ const SUPABASE_TOTAL_SUM_COLUMN = normalizeEnv(
 const SUPABASE_PRICES_TABLE = normalizeEnv(
   process.env.SUPABASE_PRICES_TABLE,
   "user_price"
-);
-const SUPABASE_PRICES_FREE_TABLE = normalizeEnv(
-  process.env.SUPABASE_PRICES_FREE_TABLE,
-  "user_price_free"
 );
 const SUPABASE_PRICE_ID_COLUMN = normalizeEnv(
   process.env.SUPABASE_PRICE_ID_COLUMN,
@@ -149,7 +141,6 @@ const normalizeLaozhangHost = (value) =>
 /**
  * `LAOZHANG_URL` — полный URL GPT Images (например `https://api.laozhang.ai/v1/images/generations`).
  * Хост оттуда же используется для относительного `LAOZHANG_GEMINI_MODEL`.
- * Устар.: только путь в `LAOZHANG_URL` + `LAOZHANG_URL_1` (хост) — всё ещё собирается во временный полный URL.
  */
 function resolveLaozhangImagesEnv() {
   const raw = normalizeEnv(process.env.LAOZHANG_URL);
@@ -171,18 +162,6 @@ function resolveLaozhangImagesEnv() {
     }
   }
 
-  const legacyHost = normalizeLaozhangHost(process.env.LAOZHANG_URL_1 || "");
-  const pathOnly = normalizeLaozhangPath(raw);
-  if (legacyHost && pathOnly) {
-    return {
-      imagesFullUrl: `https://${legacyHost}${pathOnly}`.replace(
-        /\/v1\/beta\//gi,
-        "/v1beta/"
-      ),
-      primaryHost: legacyHost,
-    };
-  }
-
   return { imagesFullUrl: "", primaryHost: "" };
 }
 
@@ -195,21 +174,25 @@ const LAOZHANG_AUTH_MODE = normalizeEnv(
   "bearer"
 ).toLowerCase();
 
-/** Шаг 1 каскада: имя модели GPT Images (Laozhang). Env `GPT_MODEL`; fallback `LAOZHANG_IMAGE_MODEL`. */
+/** Шаг 1 каскада: flare-модель GPT Images (Laozhang). Только она умеет прозрачный фон. Env `GPT_MODEL`. */
 const GPT_MODEL = normalizeEnv(
-  process.env.GPT_MODEL || process.env.LAOZHANG_IMAGE_MODEL,
+  process.env.GPT_MODEL,
   "gpt-image-2.5-flare-vip"
 );
 
-/** Шаг 2: Gemini `generateContent` — путь на хосте или полный URL. Env `LAOZHANG_GEMINI_MODEL`; fallback `LAOZHANG_GEMINI_MODEL_PATH`. */
-const LAOZHANG_GEMINI_MODEL = normalizeEnv(
-  process.env.LAOZHANG_GEMINI_MODEL || process.env.LAOZHANG_GEMINI_MODEL_PATH,
-  "/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
+/**
+ * Шаг 2: обычная gpt-image-2 — запасная для flare, если та лежит.
+ * Прозрачный фон не умеет, поэтому для него не подключается. Env `GPT_FALLBACK_MODEL`; пусто — шаг выключен.
+ */
+const GPT_FALLBACK_MODEL = normalizeEnv(
+  process.env.GPT_FALLBACK_MODEL ?? "gpt-image-2",
+  ""
 );
 
-/** Шаг 3: тот же Gemini endpoint, что и шаг 2, но с этим ключом (enterprise). Env `LAOZHANG_ENTERPRISE_TOKEN`; fallback `LAOZHANG_ENTERPRISE_API_KEY`. Пусто — шаг 3 отключён. */
-const LAOZHANG_ENTERPRISE_TOKEN = normalizeEnv(
-  process.env.LAOZHANG_ENTERPRISE_TOKEN || process.env.LAOZHANG_ENTERPRISE_API_KEY
+/** Шаг 3 (запасной, кроме прозрачного фона): Gemini `generateContent` — путь на хосте или полный URL. Env `LAOZHANG_GEMINI_MODEL`. */
+const LAOZHANG_GEMINI_MODEL = normalizeEnv(
+  process.env.LAOZHANG_GEMINI_MODEL,
+  "/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
 );
 
 function resolveLaozhangAbsoluteUrl(host, pathOrFullUrl) {
@@ -260,8 +243,6 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
   "x-webhook-secret"
 );
 
-const OPENROUTER_API_KEY = normalizeEnv(process.env.OPENROUTER_API_KEY);
-const OPENROUTER_MODEL = normalizeEnv(process.env.OPENROUTER_MODEL);
 
 /** Seedance (laozhang) видео: см. https://docs.laozhang.ai/en/api-capabilities/seedance2-video-generation */
 const SEEDANCE_API_KEY = normalizeEnv(
@@ -282,7 +263,7 @@ const TMPFILES_UPLOAD_URL = normalizeEnv(
   "https://tmpfiles.org/api/v1/upload"
 );
 
-/** @type {Map<string, { chatId: string, cost: number, versionRuntime: string, createdAt: number }>} */
+/** @type {Map<string, { chatId: string, cost: number, createdAt: number }>} */
 const videoJobMetaByTaskId = new Map();
 /** @type {Map<string, { videoUrl: string, balance: number }>} */
 const videoJobResultByTaskId = new Map();
@@ -299,8 +280,6 @@ const supabase =
         auth: { persistSession: false },
       })
     : null;
-
-const sseClientsByChatId = new Map();
 
 app.set("trust proxy", 1);
 app.use(cookieParser());
@@ -389,8 +368,9 @@ function setChatCookies(req, res, chatId) {
     path: "/",
   };
 
-  res.cookie("chatid", String(chatId), { ...common, httpOnly: false });
-  res.cookie("tg_session", "1", { ...common, httpOnly: true });
+  // Только подписанный токен: голый chat_id в куке подделывается кем угодно.
+  const token = createSessionToken(chatId);
+  if (token) res.cookie("tg_session", token, { ...common, httpOnly: true });
 }
 
 function createSessionToken(chatId) {
@@ -451,10 +431,6 @@ function verifySessionToken(tokenValue) {
   if (!crypto.timingSafeEqual(expectedBuf, sigBuf)) return null;
 
   return String(chatIdRaw);
-}
-
-function buildSuccessRedirectUrl(chatId) {
-  return buildSuccessRedirectUrlWithOverride(chatId, null);
 }
 
 function isAllowedFrontendOrigin(origin) {
@@ -532,7 +508,8 @@ async function createUserIfMissing(chatId) {
   const insertPayload = {
     [SUPABASE_CHAT_ID_COLUMN]: String(chatId),
     [SUPABASE_BALANCE_COLUMN]: 1,
-    [SUPABASE_BALANCE_FREE_COLUMN]: 0,
+    // balance_free и version — колонки, общие с ботом; FREE-режима больше нет
+    balance_free: 0,
     [SUPABASE_TOTAL_SUM_COLUMN]: 0,
     [SUPABASE_VERSION_COLUMN]: "PRO",
     format_photo: "auto",
@@ -560,9 +537,8 @@ const BALANCE_CAS_MAX_ATTEMPTS = 6;
  * Без этого при параллельных запросах все они читают один и тот же баланс,
  * все проходят проверку "хватает ли" и все списывают независимо — баланс
  * может улететь в минус, а провайдер уже реально оплачен за каждую генерацию.
- * extraFields — доп. поля, которые нужно проставить вместе со списанием (напр. version).
  */
-async function reserveBalance(chatId, balanceColumn, cost, extraFields = {}) {
+async function reserveBalance(chatId, balanceColumn, cost) {
   if (!supabase) return { ok: true, balance: null };
 
   let known = null;
@@ -580,7 +556,7 @@ async function reserveBalance(chatId, balanceColumn, cost, extraFields = {}) {
     const next = known - cost;
     const { data, error } = await supabase
       .from(SUPABASE_USERS_TABLE)
-      .update({ [balanceColumn]: next, ...extraFields })
+      .update({ [balanceColumn]: next })
       .eq(SUPABASE_CHAT_ID_COLUMN, chatId)
       .eq(balanceColumn, known)
       .select(balanceColumn);
@@ -811,34 +787,6 @@ function parseWebhookPayload(payloadValue) {
   };
 }
 
-function normalizeVersionRuntime(value) {
-  return String(value || "").toLowerCase() === "free" ? "free" : "pro";
-}
-
-function normalizeVersionStorage(value) {
-  return normalizeVersionRuntime(value) === "free" ? "FREE" : "PRO";
-}
-
-function resolveVersionConfig(versionRuntime) {
-  if (versionRuntime === "free") {
-    return {
-      versionRuntime: "free",
-      versionStorage: "FREE",
-      balanceColumn: SUPABASE_BALANCE_FREE_COLUMN,
-      pricesTable: SUPABASE_PRICES_FREE_TABLE,
-      upstreamUrl: LAOZHANG_IMAGES_URL,
-    };
-  }
-
-  return {
-    versionRuntime: "pro",
-    versionStorage: "PRO",
-    balanceColumn: SUPABASE_BALANCE_COLUMN,
-    pricesTable: SUPABASE_PRICES_TABLE,
-    upstreamUrl: LAOZHANG_IMAGES_URL,
-  };
-}
-
 function buildLaozhangUpstreamCandidates(upstreamFullUrl) {
   if (!upstreamFullUrl) return [];
   return [upstreamFullUrl];
@@ -910,27 +858,7 @@ function resolvePaymentUrl(raw) {
   );
 }
 
-function emitSseEvent(chatId, eventName, payload = {}) {
-  const subscribers = sseClientsByChatId.get(String(chatId));
-  if (!subscribers?.size) return;
-
-  const eventPayload = JSON.stringify({
-    chat_id: String(chatId),
-    ts: Date.now(),
-    ...payload,
-  });
-
-  subscribers.forEach((client) => {
-    client.write(`event: ${eventName}\ndata: ${eventPayload}\n\n`);
-  });
-}
-
-function resolveChatIdFromRequest(req, options = {}) {
-  const { allowQuerySession = false } = options;
-
-  const chatIdFromCookie = req.cookies?.chatid;
-  if (chatIdFromCookie) return String(chatIdFromCookie);
-
+function resolveChatIdFromRequest(req) {
   const authHeader = String(req.headers.authorization || "");
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice(7).trim()
@@ -939,11 +867,8 @@ function resolveChatIdFromRequest(req, options = {}) {
   const chatIdFromToken = verifySessionToken(token);
   if (chatIdFromToken) return String(chatIdFromToken);
 
-  if (allowQuerySession) {
-    const queryToken = String(req.query?.session || "").trim();
-    const chatIdFromQueryToken = verifySessionToken(queryToken);
-    if (chatIdFromQueryToken) return String(chatIdFromQueryToken);
-  }
+  const chatIdFromCookie = verifySessionToken(req.cookies?.tg_session);
+  if (chatIdFromCookie) return String(chatIdFromCookie);
 
   return "";
 }
@@ -972,105 +897,6 @@ function extractPromptText(body = {}) {
   ].filter((value) => typeof value === "string" && value.trim());
 
   return directCandidates[0] || "";
-}
-
-/**
- * Фильтр промпта через OpenRouter до вызова Laozhang. Без ключа — пропускает запрос.
- */
-async function checkPromptWithOpenRouter(prompt) {
-  if (!OPENROUTER_API_KEY) {
-    return {
-      ok: true,
-      safe: true,
-      shouldBlock: false,
-      hasClearIntent: true,
-      model: null,
-    };
-  }
-
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": FRONTEND_ORIGIN,
-        "X-Title": "NanoBanana Prompt Filter",
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        temperature: 0,
-        messages: [
-          {
-            role: "system",
-            content: `Проверь текстовый prompt для генерации изображения.
-            Верни только JSON:
-            {"shouldBlock":false,"hasClearIntent":true}
-
-          Правила:
-          - shouldBlock=true, ТОЛЬКО: обнажёнка.
-          - hasClearIntent=false, если это бессмысленный набор символов, случайные буквы.
-          - Короткие, но понятные запросы (например "кот в шляпе") считаются нормальными.
-          - Ничего кроме JSON не пиши.`,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "prompt_safety_check",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                shouldBlock: { type: "boolean" },
-                hasClearIntent: { type: "boolean" },
-              },
-              required: ["shouldBlock", "hasClearIntent"],
-              additionalProperties: false,
-            },
-          },
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const raw = await response.text();
-    throw new Error(`OpenRouter error ${response.status}: ${raw}`);
-  }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  let parsed;
-  try {
-    parsed =
-      typeof content === "string" && content.trim()
-        ? JSON.parse(content)
-        : {};
-  } catch {
-    throw new Error("OpenRouter returned invalid JSON");
-  }
-
-  const shouldBlock = Boolean(parsed.shouldBlock);
-  const hasClearIntent = parsed.hasClearIntent !== false;
-
-  return {
-    ok: true,
-    model: OPENROUTER_MODEL,
-    safe: !shouldBlock,
-    shouldBlock,
-    hasClearIntent,
-    riskLevel: shouldBlock ? "high" : "low",
-    reasons: shouldBlock ? ["explicit_content"] : [],
-    shortMessageRu:
-      "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
-    suggestedRewrite: null,
-  };
 }
 
 function extractInlineImagesFromRequestBody(body = {}) {
@@ -1394,49 +1220,6 @@ app.post("/api/feedback", async (req, res) => {
   }
 });
 
-app.get("/api/prompts", (req, res) => {
-  res.json(promptsLibrary);
-});
-
-app.get("/api/events", (req, res) => {
-  const chatId = resolveChatIdFromRequest(req, { allowQuerySession: true });
-  if (!chatId) {
-    return res.status(401).json({
-      error: "Не авторизован. Войдите через Telegram или Google.",
-    });
-  }
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
-
-  const clients = sseClientsByChatId.get(chatId) || new Set();
-  clients.add(res);
-  sseClientsByChatId.set(chatId, clients);
-
-  res.write(
-    `event: connected\ndata: ${JSON.stringify({
-      ok: true,
-      chat_id: chatId,
-      ts: Date.now(),
-    })}\n\n`
-  );
-
-  const heartbeat = setInterval(() => {
-    res.write(`: ping ${Date.now()}\n\n`);
-  }, 25000);
-
-  req.on("close", () => {
-    clearInterval(heartbeat);
-    const active = sseClientsByChatId.get(chatId);
-    if (!active) return;
-    active.delete(res);
-    if (!active.size) sseClientsByChatId.delete(chatId);
-  });
-});
-
 app.get("/auth/telegram/callback", async (req, res) => {
   try {
     const check = isTelegramAuthDataValid(req.query);
@@ -1655,11 +1438,6 @@ app.get("/auth/me", requireChatId, async (req, res) => {
       chat_id: req.chatId,
       balance:
         SUPABASE_BALANCE_COLUMN in user ? user[SUPABASE_BALANCE_COLUMN] : null,
-      balance_free:
-        SUPABASE_BALANCE_FREE_COLUMN in user
-          ? user[SUPABASE_BALANCE_FREE_COLUMN]
-          : null,
-      version: normalizeVersionRuntime(user?.[SUPABASE_VERSION_COLUMN]),
       user,
     });
   } catch (error) {
@@ -1684,44 +1462,11 @@ app.post("/auth/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/version", requireChatId, async (req, res) => {
-  try {
-    if (!supabase) {
-      return res.status(500).json({ error: "Supabase не настроен" });
-    }
-
-    const versionRuntime = normalizeVersionRuntime(req.body?.version);
-    const versionStorage = normalizeVersionStorage(req.body?.version);
-
-    const { error } = await supabase
-      .from(SUPABASE_USERS_TABLE)
-      .update({ [SUPABASE_VERSION_COLUMN]: versionStorage })
-      .eq(SUPABASE_CHAT_ID_COLUMN, req.chatId);
-
-    if (error) {
-      if (error?.code === "PGRST204") {
-        return res.status(400).json({
-          error: `Добавь колонку '${SUPABASE_VERSION_COLUMN}' в таблицу '${SUPABASE_USERS_TABLE}' для сохранения версии.`,
-        });
-      }
-      throw error;
-    }
-
-    return res.json({ ok: true, version: versionRuntime });
-  } catch (error) {
-    console.error("version update error", error);
-    return res.status(500).json({ error: "Не удалось сохранить версию" });
-  }
-});
-
 app.get("/api/pricing", requireChatId, async (req, res) => {
   try {
-    const version = normalizeVersionRuntime(req.query?.version);
-    const versionCfg = resolveVersionConfig(version);
-    const plans = await getPricingPlans(versionCfg.pricesTable);
+    const plans = await getPricingPlans(SUPABASE_PRICES_TABLE);
 
     return res.json({
-      version: versionCfg.versionRuntime,
       plans: plans.map(mapPlanForFrontend),
     });
   } catch (error) {
@@ -1772,9 +1517,7 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       return res.status(400).json({ error: "planId обязателен" });
     }
 
-    const requestedVersion = normalizeVersionRuntime(req.body?.version);
-    const versionCfg = resolveVersionConfig(requestedVersion);
-    const plan = await getPricingPlanById(planId, versionCfg.pricesTable);
+    const plan = await getPricingPlanById(planId, SUPABASE_PRICES_TABLE);
 
     if (!plan) {
       return res.status(404).json({ error: "Тариф не найден" });
@@ -1816,7 +1559,7 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       : `${req.chatId}-${plan[SUPABASE_PRICE_ID_COLUMN]}`;
     const providerRequestBody = {
       paymentMethod: PAYMENT_METHOD,
-      description: `Оплата ${generations} генераций (${versionCfg.versionRuntime.toUpperCase()}) для юзера ${
+      description: `Оплата ${generations} генераций для юзера ${
         req.chatId
       }${promo ? ` по промокоду ${promo.code} (−${discountPercent}%)` : ""}`,
       paymentDetails: {
@@ -1867,7 +1610,6 @@ app.post("/api/payments/create", requireChatId, async (req, res) => {
       ok: true,
       paymentUrl,
       raw,
-      version: versionCfg.versionRuntime,
       amount: finalAmount,
       basePrice: amount,
       promoCode: promo ? normalizePromoCode(promo.code) : null,
@@ -1907,29 +1649,14 @@ app.post("/api/webhooks/platega", async (req, res) => {
     const { chatId, planId, discountPercent } = parsed;
 
     if (status === "pending") {
-      emitSseEvent(chatId, "payment_pending", {
-        type: "payment_pending",
-        status,
-        plan_id: planId,
-      });
       return res.json({ ok: true, pending: true, status });
     }
 
     if (["canceled", "chargebacked"].includes(status)) {
-      emitSseEvent(chatId, "payment_failed", {
-        type: "payment_failed",
-        status,
-        plan_id: planId,
-      });
       return res.json({ ok: true, ignored: true, status });
     }
 
     if (status !== "confirmed") {
-      emitSseEvent(chatId, "payment_failed", {
-        type: "payment_failed",
-        status: status || "unknown",
-        plan_id: planId,
-      });
       return res.json({ ok: true, ignored: true, status });
     }
 
@@ -1938,11 +1665,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       return res.status(404).json({ error: "user not found" });
     }
 
-    const selectedVersion = normalizeVersionRuntime(
-      user?.[SUPABASE_VERSION_COLUMN]
-    );
-    const versionCfg = resolveVersionConfig(selectedVersion);
-    const plan = await getPricingPlanById(planId, versionCfg.pricesTable);
+    const plan = await getPricingPlanById(planId, SUPABASE_PRICES_TABLE);
 
     if (!plan) {
       return res.status(404).json({ error: "pricing plan not found" });
@@ -1954,7 +1677,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
       Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0),
       discountPercent
     );
-    const currentBalance = Number(user?.[versionCfg.balanceColumn] || 0);
+    const currentBalance = Number(user?.[SUPABASE_BALANCE_COLUMN] || 0);
     const currentTotalSum = Number(user?.[SUPABASE_TOTAL_SUM_COLUMN] || 0);
 
     const nextBalance = Number.isFinite(currentBalance)
@@ -1968,7 +1691,7 @@ app.post("/api/webhooks/platega", async (req, res) => {
     const { error: updateError } = await supabase
       .from(SUPABASE_USERS_TABLE)
       .update({
-        [versionCfg.balanceColumn]: nextBalance,
+        [SUPABASE_BALANCE_COLUMN]: nextBalance,
         [SUPABASE_TOTAL_SUM_COLUMN]: nextTotalSum,
       })
       .eq(SUPABASE_CHAT_ID_COLUMN, chatId);
@@ -1977,17 +1700,10 @@ app.post("/api/webhooks/platega", async (req, res) => {
       throw updateError;
     }
 
-    emitSseEvent(chatId, "balance_update", {
-      type: "balance_update",
-      version: versionCfg.versionRuntime,
-      balance: nextBalance,
-      total_sum: nextTotalSum,
-    });
 
     return res.json({
       ok: true,
       chat_id: chatId,
-      version: versionCfg.versionRuntime,
       plan_id: planId,
       payment_id: planId,
       balance: nextBalance,
@@ -2018,11 +1734,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         .json({ error: "Пользователь не найден в Supabase" });
     }
 
-    const requestedVersion = normalizeVersionRuntime(
-      user?.[SUPABASE_VERSION_COLUMN]
-    );
-    const versionCfg = resolveVersionConfig(requestedVersion);
-    const rawBalance = Number(user?.[versionCfg.balanceColumn]);
+    const rawBalance = Number(user?.[SUPABASE_BALANCE_COLUMN]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
     const requestedCount = Math.max(1, Number(req.body?.numberOfImages || 1));
 
@@ -2035,41 +1747,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    const promptText = extractPromptText(req.body);
-
-    if (promptText.trim()) {
-      let moderation;
-      try {
-        moderation = await checkPromptWithOpenRouter(promptText);
-      } catch (error) {
-        console.error("OpenRouter prompt check failed", error);
-        return res.status(503).json({
-          error:
-            "Проверка промпта временно недоступна. Попробуйте через минуту.",
-          code: "PROMPT_CHECK_UNAVAILABLE",
-        });
-      }
-
-      if (moderation.shouldBlock) {
-        return res.status(422).json({
-          error:
-            moderation.shortMessageRu ||
-            "Запрос содержит 18+ контент и не может быть отправлен в генерацию.",
-          code: "PROMPT_BLOCKED",
-          moderation: {
-            safe: moderation.safe,
-            shouldBlock: moderation.shouldBlock,
-            riskLevel: moderation.riskLevel,
-            reasons: moderation.reasons,
-            suggestedRewrite: moderation.suggestedRewrite,
-            model: moderation.model,
-          },
-        });
-      }
-    }
-
     const upstreamPayloadBase = { ...req.body };
-    delete upstreamPayloadBase.version;
 
     const rawImagesInBody = Array.isArray(req.body?.images)
       ? req.body.images
@@ -2099,9 +1777,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     let candidateUrl = "";
-    if (versionCfg.upstreamUrl) {
+    if (LAOZHANG_IMAGES_URL) {
       const upstreamCandidates = buildLaozhangUpstreamCandidates(
-        versionCfg.upstreamUrl
+        LAOZHANG_IMAGES_URL
       );
       if (upstreamCandidates.length) {
         candidateUrl = upstreamCandidates[0];
@@ -2121,15 +1799,17 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     const transparentBackground = req.body?.transparentBackground === true;
+    // Прозрачный фон умеет только flare-модель (GPT_MODEL): Gemini не подключаем,
+    // при её сбое честно отвечаем, что прозрачность недоступна.
     // JPEG без альфа-канала: с background=transparent API вернёт ошибку, поэтому всегда PNG.
     const imageOutputParams = transparentBackground
       ? { background: "transparent", output_format: "png" }
       : {};
 
-    const buildOpenAiStyleJsonBody = () => {
+    const buildOpenAiStyleJsonBody = (model) => {
       const prompt = extractPromptText(upstreamPayloadBase);
       const body = {
-        model: GPT_MODEL,
+        model,
         prompt,
         n: Math.max(1, requestedCount),
         response_format: "b64_json",
@@ -2224,7 +1904,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       message: "Ошибка сервиса",
     };
 
-    const attemptUpstream = async (url, apiKey, attemptIndex) => {
+    const attemptUpstream = async (url, apiKey, attemptIndex, model) => {
       const prompt = extractPromptText(upstreamPayloadBase);
 
       const useEdits = inlineImages.length > 0;
@@ -2236,7 +1916,11 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       let upstreamResponse;
       const startedAt = Date.now();
       const controller = new AbortController();
-      const configuredTimeoutMs = Number(process.env.LAOZHANG_TIMEOUT_MS || 180_000);
+      // Только страница «Убрать фон» (флаг gptOnly от неё) ждёт дольше —
+      // генерации с главной, в т.ч. с прозрачным фоном, работают как раньше
+      const configuredTimeoutMs = req.body?.gptOnly === true
+        ? 300_000
+        : Number(process.env.LAOZHANG_TIMEOUT_MS || 180_000);
       const timeoutMs =
         Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
           ? Math.min(Math.max(configuredTimeoutMs, 10_000), 10 * 60_000)
@@ -2249,7 +1933,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
       try {
         if (!useEdits) {
-          const jsonBody = buildOpenAiStyleJsonBody();
+          const jsonBody = buildOpenAiStyleJsonBody(model);
           upstreamResponse = await fetch(fetchUrl, {
             method: "POST",
             signal: controller.signal,
@@ -2259,7 +1943,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         } else {
           // Images edits: multipart — model, prompt, image (@file).
           const form = new FormData();
-          form.append("model", GPT_MODEL);
+          form.append("model", model);
           form.append(
             "prompt",
             prompt ||
@@ -2300,6 +1984,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       if (!upstreamResponse.ok) {
         console.warn("Laozhang upstream non-OK response.", {
           attempt: attemptIndex,
+          model,
           status: upstreamResponse.status,
           elapsed_ms: Date.now() - startedAt,
           useEdits,
@@ -2433,7 +2118,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       return true;
     };
 
-    const runLaozhangAttempt = async (url, apiKey, attemptIndex) => {
+    const runLaozhangAttempt = async (url, apiKey, attemptIndex, model) => {
       const effectiveUrlForLog =
         inlineImages.length > 0
           ? String(url).replace(/\/images\/generations\b/i, "/images/edits")
@@ -2455,7 +2140,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         }
 
         try {
-          const ok = await attemptUpstream(url, apiKey, attemptIndex);
+          const ok = await attemptUpstream(url, apiKey, attemptIndex, model);
           if (ok) return true;
           return false;
         } catch (error) {
@@ -2584,27 +2269,32 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     const tierDefs = [];
     if (candidateUrl) {
       tierDefs.push({
-        run: () => runLaozhangAttempt(candidateUrl, LAOZHANG_API_KEY, 1),
+        run: () => runLaozhangAttempt(candidateUrl, LAOZHANG_API_KEY, 1, GPT_MODEL),
+      });
+    }
+    // Цепочка для обычных фото: flare → gpt-image-2 → Gemini.
+    // Прозрачный фон умеет только flare — запасные для него не подключаем.
+    if (
+      candidateUrl &&
+      !transparentBackground &&
+      GPT_FALLBACK_MODEL &&
+      GPT_FALLBACK_MODEL !== GPT_MODEL
+    ) {
+      tierDefs.push({
+        run: () =>
+          runLaozhangAttempt(candidateUrl, LAOZHANG_API_KEY, 2, GPT_FALLBACK_MODEL),
       });
     }
     // Gemini не умеет прозрачный фон — вместо PNG с альфой молча вернул бы обычную картинку.
     if (geminiFullUrl && !transparentBackground) {
       tierDefs.push({
-        run: () => runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 2),
+        run: () => runGeminiAttempt(geminiFullUrl, LAOZHANG_API_KEY, 3),
       });
     }
-    if (geminiFullUrl && LAOZHANG_ENTERPRISE_TOKEN && !transparentBackground) {
-      tierDefs.push({
-        run: () =>
-          runGeminiAttempt(geminiFullUrl, LAOZHANG_ENTERPRISE_TOKEN, 3),
-      });
-    }
-
     const reservation = await reserveBalance(
       req.chatId,
-      versionCfg.balanceColumn,
-      requestedCount,
-      { [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage }
+      SUPABASE_BALANCE_COLUMN,
+      requestedCount
     );
     if (!reservation.ok) {
       return res.status(402).json({
@@ -2615,7 +2305,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
     let nextBalance = reservation.balance;
-    pendingRefund = { column: versionCfg.balanceColumn, amount: requestedCount };
+    pendingRefund = { column: SUPABASE_BALANCE_COLUMN, amount: requestedCount };
 
     const cascadeTotal = tierDefs.length;
     const reconnectNotices = [];
@@ -2642,7 +2332,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     if (!generatedImages.length) {
       const refunded = await refundBalance(
         req.chatId,
-        versionCfg.balanceColumn,
+        SUPABASE_BALANCE_COLUMN,
         requestedCount
       );
       if (refunded != null) nextBalance = refunded;
@@ -2665,6 +2355,20 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       const socketLikeFailure =
         Number(lastError?.status) === 503 &&
         /fetch failed|socket|timeout/i.test(msg);
+      // Прозрачный фон делает только flare-модель, запасных нет — говорим прямо
+      if (transparentBackground) {
+        // 451 = модерация провайдера (content_safety): сообщение у неё пустое,
+        // общая проверка на «safety» выше её не ловит
+        const moderated = Number(lastError?.status) === 451;
+        return res.status(422).json({
+          error: moderated
+            ? "Модерация нейросети не пропустила это фото. Генерация не списана — попробуйте другое фото."
+            : "Прозрачный фон сейчас недоступен — нейросеть не ответила. Генерация не списана, попробуйте позже.",
+          code: moderated ? "TRANSPARENT_SAFETY" : "TRANSPARENT_UNAVAILABLE",
+          details: generationErrors,
+          balance: nextBalance,
+        });
+      }
       return res.status(502).json({
         error: socketLikeFailure
           ? "Соединение с сервисом генерации оборвалось (часто на запросах с фото). Повторите через несколько секунд."
@@ -2681,7 +2385,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     if (chargedCount < requestedCount) {
       const refunded = await refundBalance(
         req.chatId,
-        versionCfg.balanceColumn,
+        SUPABASE_BALANCE_COLUMN,
         requestedCount - chargedCount
       );
       if (refunded != null) nextBalance = refunded;
@@ -2742,11 +2446,7 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
         .json({ error: "Пользователь не найден в Supabase" });
     }
 
-    const requestedVersion = normalizeVersionRuntime(
-      user?.[SUPABASE_VERSION_COLUMN]
-    );
-    const versionCfg = resolveVersionConfig(requestedVersion);
-    const rawBalance = Number(user?.[versionCfg.balanceColumn]);
+    const rawBalance = Number(user?.[SUPABASE_BALANCE_COLUMN]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
 
     const sound = Boolean(req.body?.sound);
@@ -2849,7 +2549,6 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     videoJobMetaByTaskId.set(taskId, {
       chatId: String(req.chatId),
       cost,
-      versionRuntime: versionCfg.versionRuntime,
       createdAt: Date.now(),
     });
 
@@ -2948,15 +2647,13 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
       return res.status(401).json({ error: "Пользователь не найден." });
     }
 
-    const versionCfg = resolveVersionConfig(meta.versionRuntime);
 
     // CAS вместо read-then-write: несколько параллельных опросов статуса одной
     // и той же задачи (или разных задач) не должны списать баланс дважды/в минус.
     const reservation = await reserveBalance(
       req.chatId,
-      versionCfg.balanceColumn,
-      meta.cost,
-      { [SUPABASE_VERSION_COLUMN]: versionCfg.versionStorage }
+      SUPABASE_BALANCE_COLUMN,
+      meta.cost
     );
     if (!reservation.ok) {
       return res.status(402).json({
@@ -2968,11 +2665,6 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
     }
     const nextBalance = reservation.balance;
 
-    emitSseEvent(req.chatId, "balance_update", {
-      type: "balance_update",
-      version: versionCfg.versionRuntime,
-      balance: nextBalance,
-    });
 
     videoJobResultByTaskId.set(taskId, {
       videoUrl,
@@ -2993,100 +2685,13 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
   }
 });
 
-app.get("/", (_req, res) => {
-  const telegramUrl = "https://t.me/nano_bananaa_ai_bot";
-  const heroImage =
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Telegram_logo.svg/3840px-Telegram_logo.svg.png?utm_source=ru.wikiquote.org&utm_campaign=index&utm_content=thumbnail";
-
-  res
-    .status(200)
-    .type("html")
-    .send(`<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Нано Банана</title>
-  <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      font-family: Geologica, Helvetica, Arial, sans-serif;
-      background:
-        linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.78)),
-        #0b1020;
-      color: #f5f7ff;
-      text-align: center;
-    }
-    .card {
-      width: min(520px, 100%);
-      padding: 28px 24px 32px;
-      border-radius: 20px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.14);
-      backdrop-filter: blur(8px);
-    }
-    a.tg {
-      display: block;
-      color: inherit;
-      text-decoration: none;
-    }
-    img {
-      width: min(150px, 100%);
-      height: auto;
-      border-radius: 16px;
-      display: block;
-      margin: 0 auto 20px;
-      box-shadow: 0 16px 40px rgba(0,0,0,.35);
-    }
-    h1 { margin: 0 0 10px; font-size: 1.45rem; }
-    p { margin: 0 0 22px; line-height: 1.5; color: rgba(245,247,255,.82); }
-    .open {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 12px 40px;
-      border-radius: 50px;
-      border: 1px solid rgba(45, 156, 219, 0.55);
-      background: linear-gradient(
-        135deg,
-        rgba(45, 156, 219, 0.92) 0%,
-        rgba(34, 122, 184, 0.92) 100%
-      );
-      color: #fff;
-      font-size: 1.2rem;
-      font-weight: 700;
-      line-height: 1.2;
-      text-decoration: none;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-      transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.2s ease;
-    }
-    .open:hover {
-      color: #fff;
-      filter: brightness(1.06);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <a class="tg" href="${telegramUrl}" target="_blank" rel="noopener noreferrer">
-      <img src="${heroImage}" alt="Telegram" width="150" height="150" />
-    </a>
-    <h1>Нано Банана</h1>
-    <p>Проводим технические работы на сайте, скоро вернемся!</p>
-    <p>Доступно в боте 👇</p>
-    <a class="open" href="${telegramUrl}" target="_blank" rel="noopener noreferrer">открыть</a>
-  </main>
-</body>
-</html>`);
+// «Промт по фото»: POST /api/describe-image (логика — в describe.js)
+registerDescribeRoutes(app, {
+  requireChatId,
+  buildLaozhangRequest,
+  apiKey: LAOZHANG_API_KEY,
+  apiHost: LAOZHANG_PRIMARY_HOST,
+  normalizeEnv,
 });
 
 const server = app.listen(PORT, () => {
@@ -3096,7 +2701,7 @@ const server = app.listen(PORT, () => {
   }
 
   console.log(
-    `Config: table=${SUPABASE_USERS_TABLE}, chatColumn=${SUPABASE_CHAT_ID_COLUMN}, versionColumn=${SUPABASE_VERSION_COLUMN}, pricesTable=${SUPABASE_PRICES_TABLE}, pricesFreeTable=${SUPABASE_PRICES_FREE_TABLE}, origins=${ALLOWED_ORIGINS.join(
+    `Config: table=${SUPABASE_USERS_TABLE}, chatColumn=${SUPABASE_CHAT_ID_COLUMN}, versionColumn=${SUPABASE_VERSION_COLUMN}, pricesTable=${SUPABASE_PRICES_TABLE}, origins=${ALLOWED_ORIGINS.join(
       ","
     )}`
   );
@@ -3108,17 +2713,11 @@ const server = app.listen(PORT, () => {
   );
 
   console.log(
-    `Prompt filter: model=${OPENROUTER_MODEL || "—"}, openrouterKey=${
-      OPENROUTER_API_KEY ? "set" : "missing"
-    }`
-  );
-
-  console.log(
     `Seedance video: apiKey=${SEEDANCE_API_KEY ? "set" : "missing"}, base=${SEEDANCE_API_BASE}, model=${SEEDANCE_MODEL}`
   );
 
   console.log(
-    `Laozhang cascade: GPT_MODEL=${GPT_MODEL} → LAOZHANG_GEMINI_MODEL=${LAOZHANG_GEMINI_MODEL || "—"} → LAOZHANG_ENTERPRISE_TOKEN=${LAOZHANG_ENTERPRISE_TOKEN ? "set" : "off"}`
+    `Laozhang cascade: GPT_MODEL=${GPT_MODEL} → GPT_FALLBACK_MODEL=${GPT_FALLBACK_MODEL || "—"} → LAOZHANG_GEMINI_MODEL=${LAOZHANG_GEMINI_MODEL || "—"}`
   );
 
   console.log(
