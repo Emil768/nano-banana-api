@@ -244,26 +244,23 @@ const WEBHOOK_SECRET_HEADER = normalizeEnv(
 );
 
 
-/** Seedance (laozhang) видео: см. https://docs.laozhang.ai/en/api-capabilities/seedance2-video-generation */
-const SEEDANCE_API_KEY = normalizeEnv(
-  process.env.SEEDANCE_API_KEY || process.env.LAOZHANG_API_KEY
+/** Wan 2.7 (laozhang) видео: см. https://docs.laozhang.ai/en/api-capabilities/wan-video-generation */
+// Нужен токен группы "Wan" — обычный ключ вернёт "Current group ... has no available channels".
+const WAN_API_KEY = normalizeEnv(process.env.LAOZHANG_WAN_API_KEY);
+const WAN_BASE_URL = normalizeEnv(
+  process.env.LAOZHANG_BASE_URL,
+  "https://api.laozhang.ai"
 );
-const SEEDANCE_API_BASE = normalizeEnv(
-  process.env.SEEDANCE_API_BASE,
-  "https://api2.laozhang.ai/seedance/api/v3"
+const WAN_I2V_MODEL = "wan2.7-i2v";
+const WAN_RESOLUTION = "720P";
+/** Приватный бакет Supabase Storage под фото для видео; Wan получает подписанную ссылку. */
+const VIDEO_INPUTS_BUCKET = normalizeEnv(
+  process.env.SUPABASE_VIDEO_BUCKET,
+  "video-inputs"
 );
-const SEEDANCE_MODEL = normalizeEnv(
-  process.env.SEEDANCE_MODEL,
-  "doubao-seedance-2-0-fast-260128"
-);
-const SEEDANCE_RESOLUTION = normalizeEnv(process.env.SEEDANCE_RESOLUTION, "720p");
-const SEEDANCE_RATIO = normalizeEnv(process.env.SEEDANCE_RATIO, "adaptive");
-const TMPFILES_UPLOAD_URL = normalizeEnv(
-  process.env.TMPFILES_UPLOAD_URL,
-  "https://tmpfiles.org/api/v1/upload"
-);
+const VIDEO_INPUT_URL_TTL_SECONDS = 60 * 60;
 
-/** @type {Map<string, { chatId: string, cost: number, createdAt: number }>} */
+/** @type {Map<string, { chatId: string, cost: number, createdAt: number, inputPath: string }>} */
 const videoJobMetaByTaskId = new Map();
 /** @type {Map<string, { videoUrl: string, balance: number }>} */
 const videoJobResultByTaskId = new Map();
@@ -944,100 +941,63 @@ function extractInlineImagesFromRequestBody(body = {}) {
   return images;
 }
 
-function resolveVideoGenerationCost(sound, durationRaw) {
-  const duration = String(durationRaw) === "10" ? "10" : "5";
-  const withSound = Boolean(sound);
-  if (duration === "5" && !withSound) return 5;
-  if (duration === "10" && !withSound) return 10;
-  if (duration === "5" && withSound) return 10;
-  if (duration === "10" && withSound) return 20;
-  return 5;
+function resolveVideoGenerationCost(durationRaw) {
+  return String(durationRaw) === "10" ? 20 : 10;
 }
 
-/**
- * Страница tmpfiles (HTML) -> прямая ссылка на файл для image_urls.
- * tmpfiles.org больше не отдаёт файл по /dl/<id>/<name> напрямую (302 -> HTML-страница):
- * реальная прямая ссылка теперь содержит доп. токен (`/dl/<ts>.<hash>/<id>/<name>`),
- * который есть только в HTML самой страницы файла — приходится её распарсить.
- */
-async function resolveTmpfilesDlUrl(pageUrl) {
-  const s = String(pageUrl || "").trim();
-  if (!s) return "";
+async function uploadVideoInput(path, buffer, mimeType) {
+  const upload = () =>
+    supabase.storage
+      .from(VIDEO_INPUTS_BUCKET)
+      .upload(path, buffer, { contentType: mimeType, upsert: false });
 
-  try {
-    const res = await fetch(s);
-    if (!res.ok) return "";
-    const html = await res.text();
-    const match = html.match(/href="(https?:\/\/tmpfiles\.org\/dl\/[^"]+)"/i);
-    return match ? match[1] : "";
-  } catch {
-    return "";
+  let { error } = await upload();
+  // Бакета ещё нет — создаём приватный и пробуем снова.
+  if (error && /bucket not found/i.test(String(error.message))) {
+    const created = await supabase.storage.createBucket(VIDEO_INPUTS_BUCKET, {
+      public: false,
+    });
+    if (created.error) {
+      console.error("Supabase createBucket error", created.error);
+      return { ok: false };
+    }
+    ({ error } = await upload());
   }
-}
-
-async function uploadBufferToTmpfiles(buffer, filename, mimeType) {
-  const form = new FormData();
-  const blob = new Blob([buffer], { type: mimeType || "image/jpeg" });
-  form.append("file", blob, filename || "ref.jpg");
-
-  const res = await fetch(TMPFILES_UPLOAD_URL, {
-    method: "POST",
-    body: form,
-  });
-
-  const json = await res.json().catch(() => ({}));
-  const statusOk =
-    String(json?.status || "").toLowerCase() === "success" ||
-    json?.success === true ||
-    json?.ok === true;
-
-  const pageUrl =
-    json?.data?.url ||
-    json?.data?.URL ||
-    json?.url ||
-    json?.data?.file?.url ||
-    "";
-
-  if (!res.ok || !statusOk || !pageUrl) {
-    const msg =
-      typeof json?.message === "string"
-        ? json.message
-        : "Не удалось загрузить файл на tmpfiles.org";
-    return { ok: false, error: msg };
+  if (error) {
+    console.error("Supabase storage upload error", error);
+    return { ok: false };
   }
 
-  return { ok: true, pageUrl: String(pageUrl) };
+  const signed = await supabase.storage
+    .from(VIDEO_INPUTS_BUCKET)
+    .createSignedUrl(path, VIDEO_INPUT_URL_TTL_SECONDS);
+  if (signed.error || !signed.data?.signedUrl) {
+    console.error("Supabase signed URL error", signed.error);
+    return { ok: false };
+  }
+  return { ok: true, url: signed.data.signedUrl };
 }
 
-function extractSeedanceTaskId(payload) {
-  return String(payload?.id || payload?.task_id || payload?.taskId || "").trim();
+function removeVideoInput(path) {
+  if (!supabase || !path) return;
+  supabase.storage
+    .from(VIDEO_INPUTS_BUCKET)
+    .remove([path])
+    .then(({ error }) => {
+      if (error) console.error("Supabase storage remove error", error);
+    });
 }
 
-function extractVideoUrlFromSeedanceRecord(record) {
-  return String(
-    record?.content?.video_url ||
-      record?.result_url ||
-      record?.data?.content?.video_url ||
-      ""
-  ).trim();
-}
-
-function normalizeSeedanceState(stateRaw) {
-  return String(stateRaw || "")
+function normalizeWanStatus(statusRaw) {
+  return String(statusRaw || "")
     .trim()
     .toLowerCase();
 }
 
-function isSeedancePendingState(state) {
-  return ["queued", "running"].includes(state);
-}
-
-function isSeedanceFailedState(state) {
-  return ["failed", "expired"].includes(state);
-}
-
-function isSeedanceSuccessState(state) {
-  return ["succeeded", "completed"].includes(state);
+function extractWanError(raw) {
+  return String(
+    raw?.error?.message || raw?.fail_reason || raw?.message || ""
+  ).trim();
 }
 
 /**
@@ -1046,18 +1006,15 @@ function isSeedanceSuccessState(state) {
  * воспроизводится стабильно, при этом classic `https`-модуль и curl читают
  * тот же ответ без проблем. Поэтому здесь — сырой https.request вместо fetch.
  */
-function seedanceFetchJson(pathname, init = {}) {
-  const base = new URL(SEEDANCE_API_BASE);
-  const target = pathname.startsWith("http")
-    ? new URL(pathname)
-    : new URL(`${base.pathname.replace(/\/$/, "")}${pathname}`, base);
+function wanFetchJson(pathname, init = {}) {
+  const target = new URL(pathname, WAN_BASE_URL);
 
   const headers = { ...(init.headers || {}) };
   const hasAuthHeader = Object.keys(headers).some(
     (key) => key.toLowerCase() === "authorization"
   );
   if (!hasAuthHeader) {
-    headers["Authorization"] = `Bearer ${SEEDANCE_API_KEY}`;
+    headers["Authorization"] = `Bearer ${WAN_API_KEY}`;
   }
 
   const body = typeof init.body === "string" ? init.body : undefined;
@@ -1080,7 +1037,7 @@ function seedanceFetchJson(pathname, init = {}) {
           try {
             raw = text ? JSON.parse(text) : {};
           } catch {
-            console.error("Seedance response is not valid JSON.", {
+            console.error("Wan response is not valid JSON.", {
               status: res.statusCode,
               bodyPreview: text.slice(0, 500),
             });
@@ -1107,6 +1064,7 @@ function pruneVideoJobMaps() {
   const now = Date.now();
   for (const [id, meta] of videoJobMetaByTaskId) {
     if (now - meta.createdAt > maxAgeMs) {
+      removeVideoInput(meta.inputPath);
       videoJobMetaByTaskId.delete(id);
       videoJobResultByTaskId.delete(id);
     }
@@ -1485,6 +1443,88 @@ app.get("/api/promo/active", async (_req, res) => {
   } catch (error) {
     console.error("promo/active error", error);
     return res.json({ promo: null });
+  }
+});
+
+/**
+ * Новость для модалки на сайте: последняя активная строка из `news`.
+ * Публикует её scripts/publish_news.py. Кешируем на минуту — дёргается на каждой странице.
+ */
+const NEWS_TABLE = "news";
+const NEWS_CACHE_MS = 60 * 1000;
+let newsCache = { at: 0, news: null };
+const newsImageCache = new Map();
+
+async function getActiveNews() {
+  if (Date.now() - newsCache.at < NEWS_CACHE_MS) return newsCache.news;
+
+  const { data, error } = await supabase
+    .from(NEWS_TABLE)
+    .select("id, link")
+    .eq("active", true)
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  newsCache = { at: Date.now(), news: data || null };
+  return newsCache.news;
+}
+
+app.get("/api/news/active", async (_req, res) => {
+  try {
+    if (!supabase) return res.json({ news: null });
+
+    const news = await getActiveNews();
+    if (!news) return res.json({ news: null });
+
+    return res.json({
+      news: {
+        id: news.id,
+        link: news.link,
+        image: `/api/news/${news.id}/image`,
+      },
+    });
+  } catch (error) {
+    console.error("news/active error", error);
+    return res.json({ news: null });
+  }
+});
+
+/** Скрин новости. У каждой новости свой id, поэтому кешируем навсегда. */
+app.get("/api/news/:id/image", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!supabase || !Number.isInteger(id) || id <= 0) {
+      return res.status(404).end();
+    }
+
+    let image = newsImageCache.get(id);
+    if (!image) {
+      const { data, error } = await supabase
+        .from(NEWS_TABLE)
+        .select("image_base64, image_type")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data?.image_base64) return res.status(404).end();
+
+      image = {
+        type: data.image_type || "image/jpeg",
+        body: Buffer.from(data.image_base64, "base64"),
+      };
+      // Держим в памяти только пару последних скринов.
+      if (newsImageCache.size >= 3) newsImageCache.clear();
+      newsImageCache.set(id, image);
+    }
+
+    res.set("Content-Type", image.type);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(image.body);
+  } catch (error) {
+    console.error("news/image error", error);
+    return res.status(500).end();
   }
 });
 
@@ -2431,8 +2471,8 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
 app.post("/api/generate-video/start", requireChatId, async (req, res) => {
   try {
-    if (!SEEDANCE_API_KEY) {
-      return res.status(500).json({ error: "SEEDANCE_API_KEY не настроен" });
+    if (!WAN_API_KEY) {
+      return res.status(500).json({ error: "LAOZHANG_WAN_API_KEY не настроен" });
     }
 
     let user = await getUserByChatId(req.chatId);
@@ -2449,9 +2489,8 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     const rawBalance = Number(user?.[SUPABASE_BALANCE_COLUMN]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
 
-    const sound = Boolean(req.body?.sound);
     const duration = String(req.body?.duration) === "10" ? "10" : "5";
-    const cost = resolveVideoGenerationCost(sound, duration);
+    const cost = resolveVideoGenerationCost(duration);
 
     if (currentBalance < cost) {
       return res.status(402).json({
@@ -2485,63 +2524,62 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
     const ext =
       mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
 
-    const upload = await uploadBufferToTmpfiles(
-      buffer,
-      `ref.${ext}`,
-      mimeType
-    );
-
+    if (!supabase) {
+      return res.status(500).json({ error: "Supabase не настроен" });
+    }
+    const inputPath = `${req.chatId}/${crypto.randomUUID()}.${ext}`;
+    const upload = await uploadVideoInput(inputPath, buffer, mimeType);
     if (!upload.ok) {
       return res.status(502).json({
-        error: upload.error || "Не удалось загрузить картинку.",
-        code: "TMPFILES_UPLOAD_FAILED",
+        error: "Не удалось загрузить картинку.",
+        code: "VIDEO_INPUT_UPLOAD_FAILED",
       });
     }
+    const imageUrl = upload.url;
 
-    const imageUrl = await resolveTmpfilesDlUrl(upload.pageUrl);
-    if (!imageUrl) {
-      return res.status(502).json({
-        error: "Не удалось получить прямую ссылку на изображение.",
-        code: "TMPFILES_RESOLVE_FAILED",
-      });
-    }
+    const wanInput = {
+      media: [{ type: "first_frame", url: imageUrl }],
+    };
+    if (promptText) wanInput.prompt = promptText;
 
-    const { response: seedanceRes, raw: seedanceRaw } = await seedanceFetchJson(
-      "/contents/generations/tasks",
+    const { response: wanRes, raw: wanRaw } = await wanFetchJson(
+      "/wan/api/v1/services/aigc/video-generation/video-synthesis",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-DashScope-Async": "enable",
+        },
         body: JSON.stringify({
-          model: SEEDANCE_MODEL,
-          content: [
-            { type: "text", text: promptText },
-            {
-              type: "image_url",
-              image_url: { url: imageUrl },
-              role: "reference_image",
-            },
-          ],
-          ratio: SEEDANCE_RATIO,
-          duration: Number(duration),
-          resolution: SEEDANCE_RESOLUTION,
-          generate_audio: sound,
+          model: WAN_I2V_MODEL,
+          input: wanInput,
+          parameters: {
+            resolution: WAN_RESOLUTION,
+            duration: Number(duration),
+            prompt_extend: true,
+            watermark: false,
+          },
         }),
       }
     );
 
-    const taskId = extractSeedanceTaskId(seedanceRaw);
+    const taskId = String(wanRaw?.output?.task_id || "").trim();
+    console.log("Wan create", {
+      status: wanRes.status,
+      taskId,
+      requestId: wanRaw?.request_id || "",
+      model: WAN_I2V_MODEL,
+      duration: Number(duration),
+    });
 
-    if (!seedanceRes.ok || !taskId) {
-      const msg =
-        typeof seedanceRaw?.error?.message === "string" && seedanceRaw.error.message.trim()
-          ? seedanceRaw.error.message
-          : typeof seedanceRaw?.message === "string" && seedanceRaw.message.trim()
-            ? seedanceRaw.message
-            : "Не удалось создать задачу видео.";
+    if (!wanRes.ok || !taskId) {
+      console.error("Wan create failed", wanRaw);
+      removeVideoInput(inputPath);
       return res.status(502).json({
-        error: msg,
-        code: "SEEDANCE_CREATE_FAILED",
-        raw: seedanceRaw,
+        error:
+          "Не получилось запустить генерацию видео. Попробуй другое фото или повтори позже.",
+        code: "WAN_CREATE_FAILED",
+        detail: extractWanError(wanRaw) || String(wanRaw?.code || ""),
       });
     }
 
@@ -2550,6 +2588,7 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
       chatId: String(req.chatId),
       cost,
       createdAt: Date.now(),
+      inputPath,
     });
 
     return res.json({
@@ -2564,8 +2603,8 @@ app.post("/api/generate-video/start", requireChatId, async (req, res) => {
 
 app.get("/api/generate-video/status", requireChatId, async (req, res) => {
   try {
-    if (!SEEDANCE_API_KEY) {
-      return res.status(500).json({ error: "SEEDANCE_API_KEY не настроен" });
+    if (!WAN_API_KEY) {
+      return res.status(500).json({ error: "LAOZHANG_WAN_API_KEY не настроен" });
     }
 
     const taskId = String(req.query?.taskId || "").trim();
@@ -2589,53 +2628,45 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
       });
     }
 
-    const { response: seedanceRes, raw: seedanceRaw } = await seedanceFetchJson(
-      `/contents/generations/tasks/${encodeURIComponent(taskId)}`,
+    const { response: wanRes, raw: wanRaw } = await wanFetchJson(
+      `/v1/tasks/${encodeURIComponent(taskId)}`,
       { method: "GET" }
     );
 
-    const state = normalizeSeedanceState(seedanceRaw?.status);
-
-    if (!seedanceRes.ok) {
+    if (!wanRes.ok) {
+      console.error("Wan status HTTP error", { taskId, status: wanRes.status, raw: wanRaw });
       return res.status(502).json({
-        error:
-          typeof seedanceRaw?.error?.message === "string"
-            ? seedanceRaw.error.message
-            : "Ошибка Seedance API",
-        code: "SEEDANCE_STATUS_HTTP",
+        error: "Ошибка сервиса генерации видео.",
+        code: "WAN_STATUS_HTTP",
       });
     }
 
-    if (isSeedancePendingState(state)) {
+    const state = normalizeWanStatus(wanRaw?.status);
+
+    if (state === "submitted" || state === "in_progress") {
       return res.json({
         state: "pending",
-        seedanceState: seedanceRaw?.status || state,
+        progress: wanRaw?.progress || "",
       });
     }
 
-    if (isSeedanceFailedState(state)) {
+    if (state !== "completed") {
+      console.error("Wan task failed", { taskId, raw: wanRaw });
+      removeVideoInput(meta.inputPath);
       videoJobMetaByTaskId.delete(taskId);
       return res.json({
         state: "failed",
-        error:
-          String(seedanceRaw?.error?.message || "").trim() ||
-          "Генерация видео не удалась.",
-        failCode: seedanceRaw?.error?.code || "",
+        error: "Генерация видео не удалась. Попробуй другое фото или промт.",
+        detail: extractWanError(wanRaw),
       });
     }
 
-    if (!isSeedanceSuccessState(state)) {
-      return res.json({
-        state: "pending",
-        seedanceState: seedanceRaw?.status || state,
-      });
-    }
-
-    const videoUrl = extractVideoUrlFromSeedanceRecord(seedanceRaw);
+    const videoUrl = String(wanRaw?.result_url || "").trim();
     if (!videoUrl) {
+      console.error("Wan completed without result_url", { taskId, raw: wanRaw });
       return res.status(502).json({
         error: "Сервис не вернул ссылку на видео.",
-        code: "SEEDANCE_NO_VIDEO_URL",
+        code: "WAN_NO_VIDEO_URL",
       });
     }
 
@@ -2671,6 +2702,7 @@ app.get("/api/generate-video/status", requireChatId, async (req, res) => {
       balance: nextBalance,
       cost: meta.cost,
     });
+    removeVideoInput(meta.inputPath);
     videoJobMetaByTaskId.delete(taskId);
 
     return res.json({
@@ -2713,7 +2745,7 @@ const server = app.listen(PORT, () => {
   );
 
   console.log(
-    `Seedance video: apiKey=${SEEDANCE_API_KEY ? "set" : "missing"}, base=${SEEDANCE_API_BASE}, model=${SEEDANCE_MODEL}`
+    `Wan video: apiKey=${WAN_API_KEY ? "set" : "missing"}, base=${WAN_BASE_URL}, model=${WAN_I2V_MODEL}`
   );
 
   console.log(

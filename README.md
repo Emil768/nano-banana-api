@@ -57,13 +57,10 @@ npm start
 - `VISION_GEMINI_NATIVE=false` — `true`: Gemini зовётся нативным API (inline_data), а не через chat/completions
 - `DESCRIBE_PER_MINUTE=10` — защита от скриптов: не больше N описаний в минуту на юзера (дневного лимита нет)
 
-- `SEEDANCE_API_KEY=` — ключ для видео (Seedance, laozhang); пусто — используется `LAOZHANG_API_KEY`
-- `SEEDANCE_API_BASE=https://api2.laozhang.ai/seedance/api/v3`
-- `SEEDANCE_MODEL=doubao-seedance-2-0-fast-260128`
-- `SEEDANCE_RESOLUTION=720p`
-- `SEEDANCE_RATIO=adaptive` — `16:9`/`4:3`/`1:1`/`3:4`/`9:16`/`21:9`/`adaptive`
+- `LAOZHANG_WAN_API_KEY=` — токен группы "Wan" в laozhang (обычный ключ не подойдёт)
+- `LAOZHANG_BASE_URL=https://api.laozhang.ai` — запасной `https://api2.laozhang.ai`
 
-`POST /api/generate-video/start` создаёт задачу через `POST {SEEDANCE_API_BASE}/contents/generations/tasks` (image-to-video: текст промпта + `image_url` с `role: "reference_image"`), `GET /api/generate-video/status` опрашивает `GET {SEEDANCE_API_BASE}/contents/generations/tasks/{id}` пока `status` не станет `succeeded`/`completed` (видео — в `content.video_url`) или `failed`/`expired`. См. https://docs.laozhang.ai/en/api-capabilities/seedance2-video-generation
+`POST /api/generate-video/start` создаёт задачу `wan2.7-i2v` (720P, фото → `first_frame`) через `POST {LAOZHANG_BASE_URL}/wan/api/v1/services/aigc/video-generation/video-synthesis` с заголовком `X-DashScope-Async: enable`. `GET /api/generate-video/status` опрашивает `GET {LAOZHANG_BASE_URL}/v1/tasks/{task_id}`: `submitted`/`in_progress` — ждём, `completed` — видео в `result_url` (ссылка живёт 24 ч), всё остальное — провал. См. https://docs.laozhang.ai/en/api-capabilities/wan-video-generation
 
 - `SUPABASE_SOURCE_COLUMN=` (опционально: если есть отдельная колонка для источника)
 - `PAYMENT_PROVIDER_URL=https://app.platega.io/transaction/process`
@@ -130,6 +127,6 @@ npm start
 
 ## 8) Важно по безопасности
 
-- Не хранить `SUPABASE_SERVICE_ROLE_KEY`, `LAOZHANG_API_KEY` и `SEEDANCE_API_KEY` во фронте.
+- Не хранить `SUPABASE_SERVICE_ROLE_KEY`, `LAOZHANG_API_KEY` и `LAOZHANG_WAN_API_KEY` во фронте.
 - Использовать только HTTPS.
 - В проде лучше оставить `COOKIE_SECURE=true`.
