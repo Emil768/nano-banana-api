@@ -192,7 +192,7 @@ const GPT_FALLBACK_MODEL = normalizeEnv(
 /** Шаг 3 (запасной, кроме прозрачного фона): Gemini `generateContent` — путь на хосте или полный URL. Env `LAOZHANG_GEMINI_MODEL`. */
 const LAOZHANG_GEMINI_MODEL = normalizeEnv(
   process.env.LAOZHANG_GEMINI_MODEL,
-  "/v1beta/models/gemini-3.1-flash-image-preview:generateContent"
+  "/v1beta/models/gemini-nano-banana-2.1:generateContent"
 );
 
 function resolveLaozhangAbsoluteUrl(host, pathOrFullUrl) {

@@ -48,7 +48,7 @@ npm start
 - `LAOZHANG_AUTH_MODE=bearer` (или `query`)
 - `LAOZHANG_URL=https://api.laozhang.ai/v1/images/generations` — полный URL шага 1 (GPT Images); хост из того же значения используется для относительного `LAOZHANG_GEMINI_MODEL`.
 - `GPT_MODEL=gpt-image-2.5-flare-vip` — модель для шага 1 (Images API)
-- `LAOZHANG_GEMINI_MODEL=/v1beta/models/…:generateContent` — шаг 2 (Gemini): путь на том же хосте или полный URL
+- `LAOZHANG_GEMINI_MODEL=/v1beta/models/gemini-nano-banana-2.1:generateContent` — запасной шаг (Gemini): путь на том же хосте или полный URL. `gemini-3.1-flash-image(-preview)` Google отключает 29.10.2026 — не возвращать
 
 Порядок для `POST /api/generate-image`: каскад (1) flare-модель из `GPT_MODEL`, (2) обычная `gpt-image-2` из `GPT_FALLBACK_MODEL` (пусто — шаг выключен), (3) Gemini (`LAOZHANG_GEMINI_MODEL`). В ответе могут быть `fallbackTier`, `cascadeTotal`, `reconnectNotices`. При `"transparentBackground": true` к запросу GPT Images добавляются `background: "transparent"` и `output_format: "png"`, а шаги 2 и 3 не подключаются: прозрачный фон умеет только flare. Если она не справилась — **422** `TRANSPARENT_UNAVAILABLE` (или `TRANSPARENT_SAFETY`, если отказала модерация), генерация не списывается. Флаг `"gptOnly": true` (шлёт страница «Убрать фон») увеличивает таймаут ожидания модели до 5 минут.
 
