@@ -130,3 +130,32 @@ npm start
 - Не хранить `SUPABASE_SERVICE_ROLE_KEY`, `LAOZHANG_API_KEY` и `LAOZHANG_WAN_API_KEY` во фронте.
 - Использовать только HTTPS.
 - В проде лучше оставить `COOKIE_SECURE=true`.
+
+## ИИ-ассистент (`/assistant`)
+
+Код — `src/assistant.js`, системный промт — `prompts/assistant-system.md` (читается на каждом запросе, правится без рестарта).
+
+Один раз прогнать в Supabase → SQL Editor:
+1. `sql/assistant.sql` — колонки в `user_settings`, таблицы диалогов, бакет `assistant-images`.
+2. `sql/tariffs-2026-10.sql` — новые цены и уровни ассистента в `user_price`.
+
+Статистика за день — `sql/assistant-stats.sql`.
+
+Роуты (все с cookie): `GET /api/assistant/state`, `GET /api/assistant/conversations`, `GET /api/assistant/conversations/:id/messages`, `POST /api/assistant/upload`, `POST /api/assistant/chat` (ответ — SSE: `meta`, `delta`, `tool_start`, `image`, `tool_error`, `error`, `done`).
+
+Учёт: `units = tokens_in + tokens_out × ASSISTANT_OUT_WEIGHT`. Юзер видит только процент.
+Уровень даёт пакет: колонка `user_price.assistant_tier` (`pro`/`mega`/`ultra`), при оплате ставится на `ASSISTANT_TIER_DAYS` дней, не понижается.
+
+Env (в скобках — значение по умолчанию):
+- `ASSISTANT_MODEL` (`gpt-6-luna`), `ASSISTANT_MODEL_LABEL` (`GPT-6 Luna`), `ASSISTANT_API_URL` (`https://api.laozhang.ai/v1/chat/completions`), ключ — общий `LAOZHANG_API_KEY`
+- `ASSISTANT_PRICE_IN` (0.10), `ASSISTANT_PRICE_OUT` (0.50) — $ за 1M токенов
+- `ASSISTANT_MAX_TOKENS` (800), `ASSISTANT_HISTORY_MESSAGES` (15), `ASSISTANT_OUT_WEIGHT` (5), `ASSISTANT_UNITS_PER_REQUEST` (5000 — для «~N запросов»)
+- `ASSISTANT_TRIAL_UNITS` (100000) — пробный, навсегда
+- `ASSISTANT_DAILY_UNITS_PRO` / `_MEGA` / `_ULTRA` (200000 / 400000 / 800000), `ASSISTANT_TIER_DAYS` (30)
+- `ASSISTANT_ENFORCE_LIMIT` (`true`) — `false` отключает блокировку по лимитам уровня
+- Защита, работает всегда: `ASSISTANT_HARD_CAP_UNITS` (3000000 на юзера в день), `ASSISTANT_DAILY_BUDGET_USD` (1 на всех), `ASSISTANT_MIN_INTERVAL_MS` (2000), `ASSISTANT_MAX_MESSAGE_CHARS` (2000)
+- `ASSISTANT_IMAGES_BUCKET` (`assistant-images`)
+
+Для теста удобно: `ASSISTANT_TRIAL_UNITS=20000`, дневные по 30000. Рубильник: `ASSISTANT_DAILY_BUDGET_USD=0`.
+
+SSE за Apache: в `ProxyPass /api` добавить `flushpackets=on`, иначе ответ придёт одним куском.

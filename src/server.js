@@ -6,6 +6,11 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createClient } from "@supabase/supabase-js";
 import { registerDescribeRoutes } from "./describe.js";
+import {
+  registerAssistantRoutes,
+  assistantTierGrant,
+  assistantPlanText,
+} from "./assistant.js";
 
 
 dotenv.config();
@@ -639,12 +644,16 @@ async function getPricingPlans(tableName = SUPABASE_PRICES_TABLE) {
 }
 
 function mapPlanForFrontend(plan) {
+  const tier = plan?.assistant_tier || null;
   return {
     id: plan?.[SUPABASE_PRICE_ID_COLUMN],
     name: plan?.[SUPABASE_PRICE_NAME_COLUMN],
     generations: Number(plan?.[SUPABASE_PRICE_GENERATIONS_COLUMN] || 0),
     price_rub: Number(plan?.[SUPABASE_PRICE_AMOUNT_COLUMN] || 0),
     promo_excluded: isPlanPromoExcluded(plan),
+    // Что даёт пакет в ИИ-ассистенте: строка для модалки оплаты
+    assistant_tier: tier,
+    assistant_text: assistantPlanText(tier),
   };
 }
 
@@ -1733,6 +1742,8 @@ app.post("/api/webhooks/platega", async (req, res) => {
       .update({
         [SUPABASE_BALANCE_COLUMN]: nextBalance,
         [SUPABASE_TOTAL_SUM_COLUMN]: nextTotalSum,
+        // Пакет от 499 ₽ открывает ассистента на 30 дней (уровень — колонка в user_price)
+        ...assistantTierGrant(user, plan?.assistant_tier),
       })
       .eq(SUPABASE_CHAT_ID_COLUMN, chatId);
 
@@ -1755,17 +1766,24 @@ app.post("/api/webhooks/platega", async (req, res) => {
   }
 });
 
-app.post("/api/generate-image", requireChatId, async (req, res) => {
+/** Ответ пайплайна без express: роут и ассистент сами решают, что с ним делать. */
+const reply = (status, body) => ({ status, body });
+
+/**
+ * Генерация картинок: каскад laozhang + резерв/возврат генераций с баланса.
+ * reqBody — тот же формат, что у POST /api/generate-image. Возвращает { status, body }.
+ */
+async function runImageGeneration(chatId, reqBody = {}) {
   /** Если оплата зарезервирована, но упадём с исключением ниже — вернуть деньги в catch. */
   let pendingRefund = null;
   try {
     if (!LAOZHANG_API_KEY) {
-      return res.status(500).json({ error: "LAOZHANG_API_KEY не настроен" });
+      return reply(500, { error: "LAOZHANG_API_KEY не настроен" });
     }
 
-    let user = await getUserByChatId(req.chatId);
+    let user = await getUserByChatId(chatId);
     if (!user && AUTO_CREATE_USER) {
-      user = await createUserIfMissing(req.chatId);
+      user = await createUserIfMissing(chatId);
     }
 
     if (!user) {
@@ -1776,10 +1794,10 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     const rawBalance = Number(user?.[SUPABASE_BALANCE_COLUMN]);
     const currentBalance = Number.isFinite(rawBalance) ? rawBalance : 0;
-    const requestedCount = Math.max(1, Number(req.body?.numberOfImages || 1));
+    const requestedCount = Math.max(1, Number(reqBody?.numberOfImages || 1));
 
     if (currentBalance < requestedCount) {
-      return res.status(402).json({
+      return reply(402, {
         error: "Недостаточно генераций. Пополните баланс.",
         code: "INSUFFICIENT_BALANCE",
         balance: currentBalance,
@@ -1787,19 +1805,19 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
 
-    const upstreamPayloadBase = { ...req.body };
+    const upstreamPayloadBase = { ...reqBody };
 
-    const rawImagesInBody = Array.isArray(req.body?.images)
-      ? req.body.images
+    const rawImagesInBody = Array.isArray(reqBody?.images)
+      ? reqBody.images
       : [];
     const hasImageObject =
-      req.body?.image != null && typeof req.body.image === "object";
+      reqBody?.image != null && typeof reqBody.image === "object";
     const inlineImages = extractInlineImagesFromRequestBody(upstreamPayloadBase);
     if (
       (rawImagesInBody.length > 0 || hasImageObject) &&
       inlineImages.length === 0
     ) {
-      return res.status(422).json({
+      return reply(422, {
         error:
           "Нужен base64 в images[].data или в image.data, не только mimeType. Прикрепите файл заново.",
         code: "MISSING_IMAGE_DATA",
@@ -1810,7 +1828,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       Boolean(normalizeEnv(process.env.LAOZHANG_GEMINI_MODEL)) &&
       !/^https?:\/\//i.test(normalizeEnv(process.env.LAOZHANG_GEMINI_MODEL));
     if (geminiNeedsHost && !LAOZHANG_PRIMARY_HOST) {
-      return res.status(500).json({
+      return reply(500, {
         error:
           "Задайте LAOZHANG_URL полным URL (https://…) или укажите LAOZHANG_GEMINI_MODEL полным адресом.",
       });
@@ -1832,13 +1850,13 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     );
 
     if (!candidateUrl && !geminiFullUrl) {
-      return res.status(500).json({
+      return reply(500, {
         error:
           "Нет канала генерации: задайте LAOZHANG_URL и/или LAOZHANG_GEMINI_MODEL",
       });
     }
 
-    const transparentBackground = req.body?.transparentBackground === true;
+    const transparentBackground = reqBody?.transparentBackground === true;
     // Прозрачный фон умеет только flare-модель (GPT_MODEL): Gemini не подключаем,
     // при её сбое честно отвечаем, что прозрачность недоступна.
     // JPEG без альфа-канала: с background=transparent API вернёт ошибку, поэтому всегда PNG.
@@ -1855,6 +1873,8 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         response_format: "b64_json",
         ...imageOutputParams,
       };
+      // Формат кадра шлёт только ассистент; обычные генерации идут как раньше
+      if (typeof reqBody?.size === "string" && reqBody.size) body.size = reqBody.size;
 
       return body;
     };
@@ -1958,7 +1978,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       const controller = new AbortController();
       // Только страница «Убрать фон» (флаг gptOnly от неё) ждёт дольше —
       // генерации с главной, в т.ч. с прозрачным фоном, работают как раньше
-      const configuredTimeoutMs = req.body?.gptOnly === true
+      const configuredTimeoutMs = reqBody?.gptOnly === true
         ? 300_000
         : Number(process.env.LAOZHANG_TIMEOUT_MS || 180_000);
       const timeoutMs =
@@ -2002,6 +2022,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
           for (const [key, value] of Object.entries(imageOutputParams)) {
             form.append(key, value);
+          }
+          if (typeof reqBody?.size === "string" && reqBody.size) {
+            form.append("size", reqBody.size);
           }
 
           const multipartHeaders = new Headers();
@@ -2089,6 +2112,9 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         contents: [{ role: "user", parts }],
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
+          ...(typeof reqBody?.aspectRatio === "string" && reqBody.aspectRatio
+            ? { imageConfig: { aspectRatio: reqBody.aspectRatio } }
+            : {}),
         },
       };
 
@@ -2332,12 +2358,12 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
       });
     }
     const reservation = await reserveBalance(
-      req.chatId,
+      chatId,
       SUPABASE_BALANCE_COLUMN,
       requestedCount
     );
     if (!reservation.ok) {
-      return res.status(402).json({
+      return reply(402, {
         error: "Недостаточно генераций. Пополните баланс.",
         code: "INSUFFICIENT_BALANCE",
         balance: reservation.balance,
@@ -2371,7 +2397,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
 
     if (!generatedImages.length) {
       const refunded = await refundBalance(
-        req.chatId,
+        chatId,
         SUPABASE_BALANCE_COLUMN,
         requestedCount
       );
@@ -2384,7 +2410,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           msg
         );
       if (safetyRejected) {
-        return res.status(422).json({
+        return reply(422, {
           error:
             "Запрос отклонён модерацией провайдера. Смените формулировку или другое фото.",
           code: "GENERATION_SAFETY",
@@ -2400,7 +2426,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         // 451 = модерация провайдера (content_safety): сообщение у неё пустое,
         // общая проверка на «safety» выше её не ловит
         const moderated = Number(lastError?.status) === 451;
-        return res.status(422).json({
+        return reply(422, {
           error: moderated
             ? "Модерация нейросети не пропустила это фото. Генерация не списана — попробуйте другое фото."
             : "Прозрачный фон сейчас недоступен — нейросеть не ответила. Генерация не списана, попробуйте позже.",
@@ -2409,7 +2435,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
           balance: nextBalance,
         });
       }
-      return res.status(502).json({
+      return reply(502, {
         error: socketLikeFailure
           ? "Соединение с сервисом генерации оборвалось (часто на запросах с фото). Повторите через несколько секунд."
           : "Ошибка генерации, попробуйте еще раз через 10 секунд",
@@ -2424,7 +2450,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     // Зарезервировали requestedCount, но реально сгенерировалось меньше — вернём разницу.
     if (chargedCount < requestedCount) {
       const refunded = await refundBalance(
-        req.chatId,
+        chatId,
         SUPABASE_BALANCE_COLUMN,
         requestedCount - chargedCount
       );
@@ -2432,7 +2458,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     }
 
     pendingRefund = null;
-    return res.json({
+    return reply(200, {
       imageData: generatedImages[0].imageData,
       images: generatedImages.map((item) => ({
         data: item.imageData,
@@ -2454,7 +2480,7 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
     if (pendingRefund) {
       try {
         await refundBalance(
-          req.chatId,
+          chatId,
           pendingRefund.column,
           pendingRefund.amount
         );
@@ -2465,8 +2491,13 @@ app.post("/api/generate-image", requireChatId, async (req, res) => {
         );
       }
     }
-    return res.status(500).json({ error: "Внутренняя ошибка сервера" });
+    return reply(500, { error: "Внутренняя ошибка сервера" });
   }
+}
+
+app.post("/api/generate-image", requireChatId, async (req, res) => {
+  const { status, body } = await runImageGeneration(req.chatId, req.body);
+  return res.status(status).json(body);
 });
 
 app.post("/api/generate-video/start", requireChatId, async (req, res) => {
@@ -2724,6 +2755,23 @@ registerDescribeRoutes(app, {
   apiKey: LAOZHANG_API_KEY,
   apiHost: LAOZHANG_PRIMARY_HOST,
   normalizeEnv,
+});
+
+// ИИ-ассистент: /api/assistant/* (логика — в assistant.js)
+registerAssistantRoutes(app, {
+  supabase,
+  requireChatId,
+  apiKey: LAOZHANG_API_KEY,
+  usersTable: SUPABASE_USERS_TABLE,
+  idColumn: SUPABASE_CHAT_ID_COLUMN,
+  balanceColumn: SUPABASE_BALANCE_COLUMN,
+  getUserByChatId,
+  createUserIfMissing,
+  autoCreateUser: AUTO_CREATE_USER,
+  runImageGeneration,
+  refundBalance,
+  // Номер шага каскада → подпись модели на карточке картинки
+  imageModelName: (tier) => (Number(tier) >= 3 ? "Nano Banana 2.1" : "GPT Image"),
 });
 
 const server = app.listen(PORT, () => {
