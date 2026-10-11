@@ -504,6 +504,25 @@ async function getUserByChatId(chatId) {
   return data || null;
 }
 
+/**
+ * Имя для обращения в ИИ-ассистенте: сохраняем при входе (Telegram — first_name,
+ * Google — given_name). Без колонки display_name (не прогнана миграция) — тихо пропускаем,
+ * вход от этого не ломается.
+ */
+function saveDisplayName(chatId, name) {
+  const clean = String(name || "").trim().slice(0, 64);
+  if (!supabase || !clean) return;
+  supabase
+    .from(SUPABASE_USERS_TABLE)
+    .update({ display_name: clean })
+    .eq(SUPABASE_CHAT_ID_COLUMN, String(chatId))
+    .then(({ error }) => {
+      if (error && !/display_name/.test(String(error.message))) {
+        console.error("save display_name error", error);
+      }
+    });
+}
+
 async function createUserIfMissing(chatId) {
   if (!supabase) return null;
 
@@ -1068,6 +1087,47 @@ function wanFetchJson(pathname, init = {}) {
   });
 }
 
+/**
+ * Раз в сутки: удалить из video-inputs файлы старше 24 часов. Обычно фото
+ * удаляется сразу после обработки, но задачи живут в памяти — после рестарта
+ * сервера их файлы иначе остались бы в бакете навсегда.
+ */
+async function sweepVideoInputs() {
+  if (!supabase) return;
+  const bucket = supabase.storage.from(VIDEO_INPUTS_BUCKET);
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const old = (item) => item?.id && Date.parse(item.created_at) < cutoff;
+  const toRemove = [];
+
+  const { data: top, error } = await bucket.list("", { limit: 1000 });
+  if (error) {
+    if (!/not found/i.test(String(error.message))) console.error("video-inputs sweep list error", error);
+    return;
+  }
+  for (const item of top || []) {
+    if (item.id) {
+      if (old(item)) toRemove.push(item.name);
+      continue;
+    }
+    // Папка юзера
+    const { data: files } = await bucket.list(item.name, { limit: 1000 });
+    for (const file of files || []) {
+      if (old(file)) toRemove.push(`${item.name}/${file.name}`);
+    }
+  }
+  for (let i = 0; i < toRemove.length; i += 500) {
+    const { error: removeError } = await bucket.remove(toRemove.slice(i, i + 500));
+    if (removeError) console.error("video-inputs sweep remove error", removeError);
+  }
+  if (toRemove.length) console.log(`video-inputs sweep: removed ${toRemove.length} files`);
+}
+
+if (supabase) {
+  const runSweep = () => sweepVideoInputs().catch((e) => console.error("video-inputs sweep error", e));
+  setTimeout(runSweep, 2 * 60 * 1000).unref();
+  setInterval(runSweep, 24 * 60 * 60 * 1000).unref();
+}
+
 function pruneVideoJobMaps() {
   const maxAgeMs = 3 * 60 * 60 * 1000;
   const now = Date.now();
@@ -1206,6 +1266,7 @@ app.get("/auth/telegram/callback", async (req, res) => {
     if (!user && AUTO_CREATE_USER) {
       user = await createUserIfMissing(chatId);
     }
+    saveDisplayName(chatId, req.query.first_name || req.query.username);
 
     setChatCookies(req, res, chatId);
     const redirectTarget = resolvePostAuthRedirect(req);
@@ -1357,6 +1418,7 @@ app.get("/auth/google/callback", async (req, res) => {
         );
       }
     }
+    saveDisplayName(chatId, profile.given_name || profile.name);
 
     if (!user) {
       if (!supabase) {
@@ -2770,6 +2832,8 @@ registerAssistantRoutes(app, {
   autoCreateUser: AUTO_CREATE_USER,
   runImageGeneration,
   refundBalance,
+  getPricingPlans: () => getPricingPlans(SUPABASE_PRICES_TABLE), // {{tariffs}} в промте
+  mapPlanForFrontend,
   // Номер шага каскада → подпись модели на карточке картинки
   imageModelName: (tier) => (Number(tier) >= 3 ? "Nano Banana 2.1" : "GPT Image"),
 });

@@ -137,7 +137,10 @@ npm start
 
 Один раз прогнать в Supabase → SQL Editor:
 1. `sql/assistant.sql` — колонки в `user_settings`, таблицы диалогов, бакет `assistant-images`.
-2. `sql/tariffs-2026-10.sql` — новые цены и уровни ассистента в `user_price`.
+2. `sql/assistant-private-images.sql` — приватные картинки (path вместо ссылки), удаление по сроку.
+3. `sql/assistant-window.sql` — окно лимита 5 часов, статистика открытий.
+4. `sql/assistant-files.sql` — документы и файлы с кодом.
+5. `sql/tariffs-2026-10.sql` — новые цены и уровни ассистента в `user_price` (в момент запуска тарифов).
 
 Статистика за день — `sql/assistant-stats.sql`.
 
@@ -149,13 +152,15 @@ npm start
 Env (в скобках — значение по умолчанию):
 - `ASSISTANT_MODEL` (`gpt-6-luna`), `ASSISTANT_MODEL_LABEL` (`GPT-6 Luna`), `ASSISTANT_API_URL` (`https://api.laozhang.ai/v1/chat/completions`), ключ — общий `LAOZHANG_API_KEY`
 - `ASSISTANT_PRICE_IN` (0.10), `ASSISTANT_PRICE_OUT` (0.50) — $ за 1M токенов
-- `ASSISTANT_MAX_TOKENS` (800), `ASSISTANT_HISTORY_MESSAGES` (15), `ASSISTANT_OUT_WEIGHT` (5), `ASSISTANT_UNITS_PER_REQUEST` (5000 — для «~N запросов»)
+- `ASSISTANT_MAX_TOKENS` (2500), `ASSISTANT_HISTORY_MESSAGES` (15), `ASSISTANT_OUT_WEIGHT` (5), `ASSISTANT_UNITS_PER_REQUEST` (5000 — для «~N запросов»)
 - `ASSISTANT_TRIAL_UNITS` (100000) — пробный, навсегда
-- `ASSISTANT_DAILY_UNITS_PRO` / `_MEGA` / `_ULTRA` (200000 / 400000 / 800000), `ASSISTANT_TIER_DAYS` (30)
+- Окно лимита уровня: `ASSISTANT_WINDOW_HOURS` (5) — открывается первым запросом; `ASSISTANT_WINDOW_UNITS_PRO` / `_MEGA` / `_ULTRA` (75000 / 150000 / 300000 за окно); `ASSISTANT_TIER_DAYS` (30)
 - `ASSISTANT_ENFORCE_LIMIT` (`true`) — `false` отключает блокировку по лимитам уровня
-- Защита, работает всегда: `ASSISTANT_HARD_CAP_UNITS` (3000000 на юзера в день), `ASSISTANT_DAILY_BUDGET_USD` (1 на всех), `ASSISTANT_MIN_INTERVAL_MS` (2000), `ASSISTANT_MAX_MESSAGE_CHARS` (2000)
-- `ASSISTANT_IMAGES_BUCKET` (`assistant-images`)
+- Защита, работает всегда: `ASSISTANT_HARD_CAP_UNITS` (3000000 на юзера за сутки МСК, сумма всех окон), `ASSISTANT_DAILY_BUDGET_USD` (1 на всех), `ASSISTANT_MIN_INTERVAL_MS` (2000), `ASSISTANT_MAX_MESSAGE_CHARS` (2000)
+- `ASSISTANT_IMAGES_BUCKET` (`assistant-images`, приватный: наружу только подписанные ссылки на час), `ASSISTANT_IMAGE_TTL_DAYS` (5 — потом файлы удаляются, текст остаётся)
+- Документы и код: `ASSISTANT_FILES_BUCKET` (`assistant-files`, приватный), `ASSISTANT_DOC_MAX_CHARS` (20000 символов текста из файла). PDF, DOCX, XLSX, CSV, TXT/MD и файлы с кодом, до 10 МБ, до 3 на сообщение
+- `ASSISTANT_VISION` (`true`) — модель видит прикреплённые фото (превью 1024px); `false` — только пути текстом
 
-Для теста удобно: `ASSISTANT_TRIAL_UNITS=20000`, дневные по 30000. Рубильник: `ASSISTANT_DAILY_BUDGET_USD=0`.
+Для теста удобно: `ASSISTANT_TRIAL_UNITS=20000`, `ASSISTANT_WINDOW_HOURS=0.1` (6 минут), лимиты окна по 30000. Рубильник: `ASSISTANT_DAILY_BUDGET_USD=0`.
 
 SSE за Apache: в `ProxyPass /api` добавить `flushpackets=on`, иначе ответ придёт одним куском.
